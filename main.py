@@ -16,8 +16,10 @@ def main():
     logging.getLogger('digit_analysis.node.traversal').setLevel(logging.INFO)
     logging.getLogger('user_dependency_graph').setLevel(logging.INFO)
     logging.getLogger('ucmexport').setLevel(logging.INFO)
-    tar_files = glob.glob(os.path.join(os.path.dirname(os.path.abspath(__file__)), '*.tar'))
+    cur_dir = os.path.dirname(os.path.abspath(__file__))
+    tar_files = glob.glob(os.path.join(cur_dir, '*.tar'))
     tar_files = sorted(map(os.path.basename, tar_files))
+    assert tar_files, f'No TAR files found in {cur_dir}'
     app = App(tar_files=tar_files)
     app.run()
     return

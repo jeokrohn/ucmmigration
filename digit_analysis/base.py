@@ -1,6 +1,6 @@
 from enum import unique, Enum
 from itertools import zip_longest
-from typing import List, Tuple
+from typing import List, Tuple, Set
 import logging
 
 __all__ = ['PatternType', 'Pattern', 'TranslationPattern', 'DnPattern', 'RoutePattern', 'ALL_PATTERN_TYPES',
@@ -73,7 +73,51 @@ class TranslationPattern(Pattern):
                 raise TranslationError(f'discard PreDot requires "." in pattern: {self}')
             return digits[dot_pos:]
 
-        new_digits = digits
+        def str_to_set_list(digits:str)->List[Set[str]]:
+            digits = iter(digits)
+            result = []
+            for digit in digits:
+                if digit == '[':
+                    # start of enumeration
+                    dset = set()
+                    p_digit = None
+                    digit = next(digits)
+                    while digit != ']':
+                        if digit == '-':
+                            digit = next(digits)
+                            for o in range(ord(p_digit),ord(digit)+1):
+                                dset.add(chr(o))
+                        else:
+                            dset.add(digit)
+                            p_digit = digit
+                        digit = next(digits)
+                    # while
+                    result.append(dset)
+                else:
+                    result.append({digit})
+                # if
+            # for
+            return result
+
+        def set_list_to_str(dset_list:List[Set[str]])->str:
+            result = ''
+            for dset in dset_list:
+                if not dset:
+                    continue
+                if len(dset)==1:
+                    append = next(iter(dset))
+                    if not append:
+                        continue
+                else:
+                    append = ''.join(sorted(dset))
+                    if append == '0123456789':
+                        append = 'X'
+                    else:
+                        append = f'[{append}]'
+                result = f'{result}{append}'
+            return result
+
+        new_digits = str_to_set_list(digits)
         if self.use_originators_calling_search_space:
             new_css = css
         else:
@@ -81,16 +125,17 @@ class TranslationPattern(Pattern):
         if self.discard_digits:
             new_digits = discard_digits(new_digits)
         if self.called_party_prefix_digits:
-            new_digits = f'{self.called_party_prefix_digits}{new_digits}'
+            new_digits = [{d} for d in self.called_party_prefix_digits] + new_digits
         if self.route_next_hop_by_calling_party_number:
             raise NotImplementedError
 
         if self.called_party_mask:
-            masked = ''.join(d if m == 'X' else m
-                             for m, d in zip_longest(self.called_party_mask[::-1],
-                                                     digits[::-1],
-                                                     fillvalue=''))
+            masked = list(d if m == 'X' else {m}
+                          for m, d in zip_longest(self.called_party_mask[::-1],
+                                                  new_digits[::-1],
+                                                  fillvalue=''))
             new_digits = masked[::-1]
+        new_digits = set_list_to_str(new_digits)
         log.debug(f'{self} translate {digits}->{new_digits}')
         return new_digits, new_css
 

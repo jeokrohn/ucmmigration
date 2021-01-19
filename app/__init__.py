@@ -257,15 +257,6 @@ class App:
         self.assert_user_graph()
         self.user_graph.draw()
 
-    @menu_register('Device type stats')
-    def menu_device_type_stats(self):
-        device_type_counter = Counter(p.device_type for p in self.proxy.phones.list)
-        device_types = list(device_type_counter)
-        device_types.sort()
-        max_len = max(len(dt) for dt in device_types)
-        for device_type in device_types:
-            print(f'{device_type:{max_len}}: {device_type_counter[device_type]}')
-
     @menu_register('Phones without lines')
     def menu_phones_no_lines(self):
         phones_no_lines = [phone for phone in self.proxy.phones.list if len(phone.lines) == 0]
@@ -276,6 +267,47 @@ class App:
         for device_type in sorted(device_types):
             output = ", ".join(phone.device_name for phone in phones_no_lines if phone.device_type == device_type)
             print(f'{device_types[device_type]:{ll}} x {device_type:{dtl}}: {output}')
+
+    @menu_register('Device type stats')
+    def menu_device_type_stats(self):
+        device_type_counter = Counter(p.device_type for p in self.proxy.phones.list)
+        device_types = list(device_type_counter)
+        device_types.sort()
+        max_len = max(len(dt) for dt in device_types)
+        for device_type in device_types:
+            print(f'{device_type:{max_len}}: {device_type_counter[device_type]:5} '
+                  f'{"supported" if device_type in SUPPORTED_DEVICES else "unsupported"}')
+        print('Supported/unsupported classification only based on device type')
+
+    @menu_register('Supported vs. unsupported phones for migration')
+    def menu_supported_phones(self):
+        phones = self.proxy.phones.list
+        # we can ignore phones with certain device types
+        relevant_phones = [phone for phone in phones if phone.device_type not in self.ANONYMOUS_DEVICE_TYPES]
+
+        sb = SunBurstHelper()
+        sb_data = {
+            'supported': defaultdict(list),
+            'unsupported': defaultdict(list)
+        }
+        for phone in relevant_phones:
+            if phone.device_type in SUPPORTED_DEVICES:
+                sb_key = 'supported'
+            else:
+                sb_key = 'unsupported'
+            sb_data[sb_key][phone.device_type].append(phone.device_name)
+        for sb_key in sb_data:
+            parent = sb.add_entry(parent_id='', label=sb_key, value=len(sb_data[sb_key]))
+            for device_type in sb_data[sb_key]:
+                device_parent = sb.add_entry(parent_id=parent, label=device_type,
+                                             value=len(sb_data[sb_key][device_type]))
+                for device_name in sb_data[sb_key][device_type]:
+                    sb.add_entry(parent_id=device_parent, label=device_name)
+        if len(sb.ids) > 10000:
+            print(f'figure with {len(sb.ids)} nodes might be hard to render...')
+        fig = sb.fig()
+        fig.update_layout(margin=dict(t=0, l=0, r=0, b=0))
+        fig.show()
 
     @menu_register('Analyze phone/user assignment')
     def menu_analyze_phone_user_assignment(self):
@@ -457,21 +489,27 @@ class App:
 
                 # determine DNs per next level digit
                 first_digits = set()
-                next_level_dns: Dict[str, List[str]] = defaultdict(list)
+                next_level_dns: Dict[str, List[str]] = defaultdict(set)
                 for ds in digit_strings:
                     first_digit = ds[0]
                     first_digits.add(first_digit)
-                    next_level_dns[first_digit].append(ds[1:])
+                    next_level_dns[first_digit].add(ds[1:])
                 first_digits = sorted(first_digits)
                 total_count /= len(first_digits)
                 for fd in first_digits:
-                    output = (f'{prefix}{fd}-{ds}' for ds in next_level_dns[fd])
-                    output = []
-                    log.debug(
-                        f'prefix {prefix}-{fd}: {total_count} {len(next_level_dns[fd])} digit strings: '
+                    nld = sorted(next_level_dns[fd])[:10]
+                    output = [f'{prefix}{fd}-{ds}' for ds in nld]
+                    if len(next_level_dns[fd]) > 10:
+                        output.append('...')
+                    remaining_length = len(next(dn for dn in next_level_dns[fd]))
+                    density = 9 ** remaining_length
+
+                    print(
+                        f'prefix {prefix}-{fd}: {int(total_count)} {len(next_level_dns[fd])}/{density} digit strings: '
                         f'{", ".join(output)}')
                 for fd in first_digits:
-                    find_clusters(prefix=f'{prefix}{fd}', digit_strings=next_level_dns[fd], total_count=total_count)
+                    find_clusters(prefix=f'{prefix}{fd}', digit_strings=list(next_level_dns[fd]),
+                                  total_count=total_count)
 
                 return []
 
@@ -555,7 +593,11 @@ class App:
 
             for prefix_len in range(1, dn_len + 1):
                 prefixes = sorted(list(set(dn[:prefix_len] for dn in dns_work)))
-                print(f'  len {prefix_len}: {len(prefixes)} prefixes: {", ".join(prefixes)}')
+                if len(prefixes) > 15:
+                    prefixes_output = prefixes[:15] + ['...']
+                else:
+                    prefixes_output = prefixes
+                print(f'  len {prefix_len}: {len(prefixes)} prefixes: {", ".join(prefixes_output)}')
 
         def search_location_prefixes(dn_len, prefix_len, dns):
             prefixes = sorted(list(set(dn[:prefix_len] for dn in dns)))
@@ -660,47 +702,7 @@ class App:
 
     @menu_register('Dial Plan Analysis')
     def menu_dial_plan_analysis(self):
-        da_tree = digit_analysis.DaNode()
-
-        def tp_from_proxy_and_translation_pattern(proxy: Proxy,
-                                                  translation_pattern: TranslationPattern) -> \
-                digit_analysis.TranslationPattern:
-            return digit_analysis.TranslationPattern(pattern=translation_pattern.pattern,
-                                                     partition=translation_pattern.partition,
-                                                     block=translation_pattern.block,
-                                                     css=proxy.css.partition_names(css_name=translation_pattern.css),
-                                                     urgent=translation_pattern.urgent,
-                                                     use_originators_calling_search_space=translation_pattern.use_originators_calling_search_space,
-                                                     discard_digits=translation_pattern.discard_digits,
-                                                     called_party_mask=translation_pattern.called_party_mask,
-                                                     called_party_prefix_digits=translation_pattern.called_party_prefix_digits,
-                                                     route_next_hop_by_calling_party_number=translation_pattern.route_next_hop_by_calling_party_number)
-
-        # add all translation patterns to DA tree
-        tps = self.proxy.translation_pattern.list
-        start = perf_counter()
-        for tp in tps:
-            da_tree.add_pattern(tp_from_proxy_and_translation_pattern(proxy=self.proxy, translation_pattern=tp))
-        log.debug(f'adding {len(tps)} translation patterns: {(perf_counter() - start) * 1000:.2f}ms')
-
-        # All dnps of the first line of all phones
-        # noinspection PyShadowingNames
-        dnps = set(first_line.dn_and_partition
-                   for phone in self.proxy.phones.list
-                   if (first_line := next(iter(phone.lines.values()), None)))
-        start = perf_counter()
-        for dnp in dnps:
-            dn, partition = dnp.split(':')
-            da_tree.add_pattern(digit_analysis.DnPattern(pattern=dn, partition=partition))
-        log.debug(f'adding {len(dnps)} DNs: {(perf_counter() - start) * 1000:.2f}ms')
-
-        # finally all route patterns
-        rps = self.proxy.route_pattern.list
-        start = perf_counter()
-        for rp in rps:
-            da_tree.add_pattern(digit_analysis.RoutePattern(pattern=rp.pattern, partition=rp.partition))
-        log.debug(f'adding {len(rps)} Route Patterns: {(perf_counter() - start) * 1000:.2f}ms')
-
+        da_tree = digit_analysis.DaNode.from_proxy(self.proxy,first_line_only=True)
         # after adding all patterns we now want to find out how to dial on-net
         # traverse the tree breadth first and consider all sub trees which potentially can get us to a DN
         # - only TPs and DNs
@@ -717,8 +719,6 @@ class App:
             print(f'Looking at line_css:device_css: {line_css_name}:{device_css_name}')
             combined_partitions = list(chain(self.proxy.css.partition_names(line_css_name),
                                              self.proxy.css.partition_names(device_css_name)))
-            print(f'combined partitions: {":".join(combined_partitions)}')
-
             # add <NONE> partition at the end if not already present somewhere in the partition list
             if next((p for p in combined_partitions if not p), None) is None:
                 print(f'appending NONE partition')
@@ -736,74 +736,6 @@ class App:
         print("\n".join(f'{tp}' for tp in blocking_tps))
         # print(da_tree.pretty())
 
-    @menu_register('Phone / User assignment consistency')
-    def menu_phone_user_consistency(self):
-        """
-        Let's see whether user/phone assignments are consistent based on
-        :return:
-        """
-        phones_by_user_id: Dict[str, Set[Phone]] = defaultdict(set)
-        for phone in self.proxy.phones.list:
-            for user_id in phone.user_ids:
-                phones_by_user_id[user_id].add(phone)
-        phones_by_user_id = {user_id: sorted(phones_by_user_id[user_id])
-                             for user_id in sorted(phones_by_user_id)}
-        # now let's look and endusers
-        phones_by_user_id1: Dict[str, Set[Phone]] = defaultdict(set)
-        for user in self.proxy.end_user.list:
-            for device_association in user.device_associations:
-                try:
-                    phones_by_user_id1[user.user_id].add(self.proxy.phones[device_association.device_name])
-                except KeyError:
-                    pass
-        phones_by_user_id1 = {user_id: sorted(phones)
-                              for user_id in sorted(phones_by_user_id1)
-                              if (phones := phones_by_user_id1[user_id])}
-        pbu_iter = ((k, v) for k, v in phones_by_user_id.items())
-        pbu_iter1 = ((k, v) for k, v in phones_by_user_id1.items())
-        user_id = None
-        user_id1 = None
-        not_in = []
-        not_in1 = []
-        differences = []
-        while True:
-            if user_id is None:
-                user_id, phones = next(pbu_iter, (None, None))
-            if user_id1 is None:
-                user_id1, phones1 = next(pbu_iter1, (None, None))
-            if user_id is None:
-                while user_id1 is not None:
-                    # noinspection PyUnboundLocalVariable
-                    not_in.append((user_id1, sorted(phones1)))
-                    user_id1, phones1 = next(pbu_iter1, (None, None))
-                break
-            if user_id1 is None:
-                while user_id is not None:
-                    # noinspection PyUnboundLocalVariable
-                    not_in1.append((user_id, sorted(phones)))
-                    user_id, phones = next(pbu_iter, (None, None))
-                break
-            # noinspection PyUnboundLocalVariable
-            phones = sorted(phones)
-            # noinspection PyUnboundLocalVariable
-            phones1 = sorted(phones1)
-            if user_id < user_id1:
-                not_in1.append((user_id, phones))
-                user_id = None
-            elif user_id > user_id1:
-                not_in.append((user_id1, phones1))
-                user_id1 = None
-            else:
-                if phones != phones1:
-                    differences.append((user_id, phones, phones1))
-                    pass
-                user_id = None
-                user_id1 = None
-            # if ...
-        # while True
-
-        print(1)
-
     @menu_register('Translation pattern overview')
     def menu_translation_pattern_overview(self):
         tps = self.proxy.translation_pattern.list
@@ -814,3 +746,40 @@ class App:
         transposed = list(zip(*rows))
         column_lens = [max(map(len, col)) for col in transposed]
         print("\n".join(' '.join(f'{c:{column_lens[i]}}' for i, c in enumerate(r)) for r in rows))
+
+    @menu_register('Find abbreviated on-net dialing')
+    def menu_abbreviated_on_net(self):
+        """
+
+        :return:
+        """
+
+        """For a given CSS find all TP terminal nodes for each terminal TP node apply TP's translation to TP's 
+        pattern and then see if that transformed digit string can hit DNs """
+        da_tree = digit_analysis.DaNode.from_proxy(self.proxy)
+
+        css_count = Counter((first_line.css, phone.css)
+                            for phone in self.proxy.phones.list
+                            if (first_line := next(iter(phone.lines.values()), None)))
+
+        css_combinations = sorted(css_count, key=lambda c: css_count[c], reverse=True)
+        for line_css_name, device_css_name in css_combinations:
+            print(f'Looking at line_css:device_css: {line_css_name}+{device_css_name}')
+            combined_partitions = list(chain(self.proxy.css.partition_names(line_css_name),
+                                             self.proxy.css.partition_names(device_css_name)))
+            # add <NONE> partition at the end if not already present somewhere in the partition list
+            if next((p for p in combined_partitions if not p), None) is None:
+                print(f'appending NONE partition')
+                combined_partitions.append('')
+            print(f'{line_css_name}+{device_css_name}: {":".join(combined_partitions)}')
+            # get all TPs that can be dialed with this CSS
+            leaves = list(da_tree.find_leaves(depth=30,
+                                              pattern_types={digit_analysis.PatternType.TP},
+                                              partitions=combined_partitions))
+            for da_node, dial_string in leaves:
+                tps = [tp for tp in da_node.terminal_pattern.values() if isinstance(tp, digit_analysis.TranslationPattern)]
+                for tp in tps:
+                    print(f'{dial_string}: {tp.pattern}')
+                    translated_dial_string, css = tp.translate(digits=tp.pattern.replace('.', ''), css=combined_partitions)
+                    foo = 1
+        pass

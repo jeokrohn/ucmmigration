@@ -47,7 +47,7 @@ class TestTp(TestCase):
         logging.basicConfig(level=logging.DEBUG)
         logging.getLogger('digit_analysis.base').setLevel(logging.DEBUG)
 
-    def test_0_translate(self):
+    def test_translate_2234_to_1234(self):
         tp = TranslationPattern(pattern='2XXX',
                                 css=['translated'],
                                 called_party_mask='1XXX')
@@ -55,7 +55,7 @@ class TestTp(TestCase):
         self.assertEqual(translated, '1234')
         self.assertEqual(css, 'translated')
 
-    def test_1_translate(self):
+    def test_translate_2345_to_1234_no_X_in_mask(self):
         tp = TranslationPattern(pattern='2XXX',
                                 css=['translated'],
                                 called_party_mask='1234')
@@ -63,7 +63,7 @@ class TestTp(TestCase):
         self.assertEqual(translated, '1234')
         self.assertEqual(css, 'translated')
 
-    def test_2_translate(self):
+    def test_translate_ESN_to_e164(self):
         tp = TranslationPattern(pattern='84969XXX',
                                 css=['translated'],
                                 called_party_mask='+4961007739XXX',
@@ -72,7 +72,7 @@ class TestTp(TestCase):
         self.assertEqual(translated, '+4961007739764')
         self.assertEqual(css, 'in')
 
-    def test_3_translate(self):
+    def test_translate_pre_dot(self):
         tp = TranslationPattern(pattern='000.49!',
                                 css=['translated'],
                                 discard_digits='PreDot',
@@ -81,7 +81,7 @@ class TestTp(TestCase):
         self.assertEqual(translated, '491')
         self.assertEqual(css, 'in')
 
-    def test_4_translate(self):
+    def test_translate_pre_dot_prefix(self):
         tp = TranslationPattern(pattern='000.49!',
                                 css=['translated'],
                                 discard_digits='PreDot',
@@ -91,15 +91,15 @@ class TestTp(TestCase):
         self.assertEqual(translated, '+491')
         self.assertEqual(css, 'in')
 
-    def test_5_missing_dot(self):
-        tp = TranslationPattern(pattern='000.49!',
+    def test_missing_dot(self):
+        tp = TranslationPattern(pattern='00049!',
                                 css=['translated'],
                                 discard_digits='PreDot',
                                 called_party_prefix_digits='+',
                                 use_originators_calling_search_space=True)
         self.assertRaises(TranslationError, lambda: tp.translate(digits='000491', css='in'))
 
-    def test_6_pre_dot_with_mask(self):
+    def test_pre_dot_with_mask(self):
         tp = TranslationPattern(pattern='000.49!',
                                 css=['translated'],
                                 discard_digits='PreDot',
@@ -108,3 +108,30 @@ class TestTp(TestCase):
         translated, css = tp.translate(digits='000491', css='in')
         self.assertEqual('91', translated)
         self.assertEqual(css, 'translated')
+
+    def test_transform_wildcard_set(self):
+        tp = TranslationPattern(pattern='1.234XX',
+                                css=['translated'],
+                                discard_digits='PreDot',
+                                called_party_mask='XXXXX')
+        translated, css = tp.translate(digits='123456', css='in')
+        self.assertEqual(css, 'translated')
+        self.assertEqual(translated, '23456')
+
+    def test_transform_wildcard_set_1(self):
+        tp = TranslationPattern(pattern='1.234XX',
+                                css=['translated'],
+                                discard_digits='PreDot',
+                                called_party_mask='XXX')
+        translated, css = tp.translate(digits='123456', css='in')
+        self.assertEqual(css, 'translated')
+        self.assertEqual(translated, '456')
+
+    def test_transform_wildcard_digit_string(self):
+        tp = TranslationPattern(pattern='1.234XX',
+                                css=['translated'],
+                                discard_digits='PreDot',
+                                called_party_mask='XXX')
+        translated, css = tp.translate(digits='123X[14-69]X', css='in')
+        self.assertEqual(css, 'translated')
+        self.assertEqual(translated, 'X[14569]X')

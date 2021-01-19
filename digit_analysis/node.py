@@ -48,10 +48,11 @@ class DaNode:
         self.matching_digits = matching_digits
 
     @staticmethod
-    def from_proxy(proxy: Proxy) -> 'DaNode':
+    def from_proxy(proxy: Proxy, first_line_only=False) -> 'DaNode':
         """
         Get a DA tree based on TPs, RPs and DNs
         :param proxy:
+        :param first_line_only:
         :return:
         """
         da_tree = DaNode()
@@ -78,10 +79,16 @@ class DaNode:
             da_tree.add_pattern(tp_from_proxy_and_translation_pattern(proxy=proxy, translation_pattern=tp))
         log.debug(f'adding {len(tps)} translation patterns: {(perf_counter() - start) * 1000:.2f}ms')
 
-        # All dnps of all lines
-        dnps = set(chain.from_iterable((line.dn_and_partition
-                                        for line in phone.lines.values())
-                                       for phone in proxy.phones.list))
+        if first_line_only:
+            # dnps of all 1st lines
+            dnps = set(first_line.dn_and_partition
+                       for phone in proxy.phones.list
+                       if (first_line := next(iter(phone.lines.values()), None)))
+        else:
+            # All dnps of all lines
+            dnps = set(chain.from_iterable((line.dn_and_partition
+                                            for line in phone.lines.values())
+                                           for phone in proxy.phones.list))
         start = perf_counter()
         for dnp in dnps:
             dn, partition = dnp.split(':')
@@ -388,7 +395,7 @@ class DaNode:
             # for
         # if
 
-    def lookup(self, digits: str, css: Union[str, List, Set])->Optional[Pattern]:
+    def lookup(self, digits: str, css: Union[str, List, Set]) -> Optional[Pattern]:
         """
         DA Lookup and return matched Pattern
         :param digits: digit string to consume
@@ -402,7 +409,7 @@ class DaNode:
         matches = list(self.matching_nodes(digits=digits, css=css))
         if not matches:
             return None
-        matches.sort(key=lambda x:x[1])
+        matches.sort(key=lambda x: x[1])
         best_match = matches[0][0]
         pattern = next(pattern
                        for partition, pattern in best_match.terminal_pattern.items()
@@ -413,7 +420,6 @@ class DaNode:
             digits, css = pattern.translate(digits, css)
             return self.lookup(digits, css)
         return pattern
-
 
     def __str__(self):
         return f'{self.depth}:{self.full_representation}'
