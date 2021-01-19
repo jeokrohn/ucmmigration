@@ -1,0 +1,6 @@
+plotly
+pandas
+networkx
+matplotlib
+scipy
+tqdm
