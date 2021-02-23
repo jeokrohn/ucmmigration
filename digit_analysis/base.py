@@ -6,6 +6,7 @@ import logging
 __all__ = ['PatternType', 'Pattern', 'TranslationPattern', 'DnPattern', 'RoutePattern', 'ALL_PATTERN_TYPES',
            'TranslationError']
 
+
 @unique
 class PatternType(Enum):
     DN = 0
@@ -37,8 +38,10 @@ class Pattern:
         partition = self.partition or 'NONE'
         return f'{self.pattern}:{partition}'
 
+
 class TranslationError(Exception):
     pass
+
 
 class TranslationPattern(Pattern):
     __slots__ = ['css', 'block', 'urgent', 'use_originators_calling_search_space', 'discard_digits',
@@ -73,7 +76,7 @@ class TranslationPattern(Pattern):
                 raise TranslationError(f'discard PreDot requires "." in pattern: {self}')
             return digits[dot_pos:]
 
-        def str_to_set_list(digits:str)->List[Set[str]]:
+        def str_to_set_list(digits: str) -> List[Set[str]]:
             digits = iter(digits)
             result = []
             for digit in digits:
@@ -85,7 +88,7 @@ class TranslationPattern(Pattern):
                     while digit != ']':
                         if digit == '-':
                             digit = next(digits)
-                            for o in range(ord(p_digit),ord(digit)+1):
+                            for o in range(ord(p_digit), ord(digit) + 1):
                                 dset.add(chr(o))
                         else:
                             dset.add(digit)
@@ -99,12 +102,12 @@ class TranslationPattern(Pattern):
             # for
             return result
 
-        def set_list_to_str(dset_list:List[Set[str]])->str:
+        def set_list_to_str(dset_list: List[Set[str]]) -> str:
             result = ''
             for dset in dset_list:
                 if not dset:
                     continue
-                if len(dset)==1:
+                if len(dset) == 1:
                     append = next(iter(dset))
                     if not append:
                         continue

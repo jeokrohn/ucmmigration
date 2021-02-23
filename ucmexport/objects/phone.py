@@ -85,33 +85,33 @@ class Line(ObjBase):
             d = self.dict
             for k in remove_keys:
                 d.pop(k)
-            self._uris = {int(k): Uri(uri) for k, uri in uris.items() if uri['on Directory Number']}
+            self._uris = {int(k): Uri(uri) for k, uri in uris.items() if uri['ON DIRECTORY NUMBER']}
         return self._uris
 
 
-SD_PATTERN = compile(r'Speed Dial (\w+) (\d+)')
+SD_PATTERN = compile(r'SPEED DIAL (\w+) (\d+)')
 
 
 class SpeedDial(ObjBase):
     @property
     def label(self):
-        return self.dict['Label']
+        return self.dict['LABEL']
 
     @property
     def number(self):
-        return self.dict['Number']
+        return self.dict['NUMBER']
 
     def __str__(self):
         return f'{self.label}:{self.number}'
 
 
-BLF_PATTERN = compile(r'Busy Lamp Field (.+) (\d+)')
+BLF_PATTERN = compile(r'BUSY LAMP FIELD (.+) (\d+)')
 
 
 class BusyLampField(ObjBase):
     def __init__(self, o: Dict):
         super(BusyLampField, self).__init__(o)
-        dn = self.dict['Directory Number']
+        dn = self.dict['DIRECTORY NUMBER']
         if dn and (m := match(r'(\d+) in (\D+)', dn)):
             # noinspection PyUnboundLocalVariable
             self._dn = m.group(1)
@@ -171,7 +171,7 @@ class Phone(ObjBase):
                 k: str
                 # look for 'Directory Number" and 'Speed Dial'
                 if (k[0] in 'DS') and \
-                        ((sd := k.startswith('Directory N')) or k.startswith('Spee')):
+                        ((sd := k.startswith('DIRECTORY N')) or k.startswith('SPEE')):
                     # end collecting the current line
                     if line is not None:
                         # collect the line
@@ -189,6 +189,7 @@ class Phone(ObjBase):
                         break
                     else:
                         line = None
+
                 if line is not None:
                     # remove this key from phone
                     if REMOVE_ATTR_FROM_PARENT:
@@ -213,7 +214,7 @@ class Phone(ObjBase):
             keys_to_delete = []
             speed_dials = defaultdict(dict)
             for k, v in self.dict.items():
-                if not k.startswith('Speed '):
+                if not k.startswith('SPEED '):
                     continue
                 if m := SD_PATTERN.match(k):
                     if REMOVE_ATTR_FROM_PARENT:
@@ -221,7 +222,7 @@ class Phone(ObjBase):
                     attribute = m.group(1)
                     index = int(m.group(2))
                     speed_dials[index][attribute] = v
-            self._speed_dials = {k: SpeedDial(v) for k, v in speed_dials.items() if v['Number']}
+            self._speed_dials = {k: SpeedDial(v) for k, v in speed_dials.items() if v['NUMBER']}
             d = self.dict
             for k in keys_to_delete:
                 d.pop(k)
@@ -233,7 +234,7 @@ class Phone(ObjBase):
             blfs = defaultdict(dict)
             keys_to_delete = []
             for k, v in self.dict.items():
-                if not k.startswith('Busy'):
+                if not k.startswith('BUSY'):
                     continue
                 if m := BLF_PATTERN.match(k):
                     if REMOVE_ATTR_FROM_PARENT:
@@ -242,7 +243,7 @@ class Phone(ObjBase):
                     index = int(m.group(2))
                     blfs[index][attribute] = v
             self._blfs = {k: BusyLampField(v) for k, v in blfs.items() if
-                          v['Destination'] or v['Directory Number'] or v['Call Pickup']}
+                          v['DESTINATION'] or v['DIRECTORY NUMBER'] or v['CALL PICKUP']}
             d = self.dict
             for k in keys_to_delete:
                 d.pop(k)
@@ -256,15 +257,15 @@ class Phone(ObjBase):
 
     @property
     def device_name(self):
-        return self.dict['Device Name']
+        return self.dict['DEVICE NAME']
 
     @property
     def device_pool(self):
-        return self.dict['Device Pool']
+        return self.dict['DEVICE POOL']
 
     @property
     def device_type(self):
-        return self.dict['Device Type']
+        return self.dict['DEVICE TYPE']
 
     @property
     def css(self):
@@ -276,7 +277,7 @@ class Phone(ObjBase):
 
     @property
     def location(self):
-        return self.dict.get('Location')
+        return self.dict.get('LOCATION')
 
     @property
     def phone_button_template(self):

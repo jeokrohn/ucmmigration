@@ -2,6 +2,8 @@ from tarfile import TarFile
 from io import TextIOWrapper
 from csv import DictReader
 from re import compile
+from itertools import chain
+
 import logging
 
 from collections import defaultdict
@@ -22,7 +24,10 @@ def to_snail(key: str) -> str:
     return RE_TO_SNAIL.sub('_', key).lower().strip('_')
 
 
-CHECK_FOR_NONE = False
+CHECK_FOR_NONE = False      # Raise an Exception if some CSV has a "None" column
+POP_NONE = True             # Remove "None" column when importing CSV
+CSV_TO_UPPER = True         # Convert all CSV Headers to uppercase
+WARN_LOWERCASE_HEADER = True   # log a warning for CSV files that have lowercase headers
 
 DNAandPartitionRelated = Dict[str, Set[str]]
 
@@ -43,6 +48,9 @@ class ObjBase(metaclass=ObjMeta):
         if CHECK_FOR_NONE:
             assert next((k for k in o if k is None), '') == '', \
                 f'ObjBase.__init__ None key found {", ".join(f"{k}:{v}" for k, v in o.items())}'
+        if POP_NONE:
+            # sometimes there seems to be a "None" column at the end which breaks stuff
+            o.pop(None, None)
         self._obj = o
 
     @property
@@ -95,8 +103,16 @@ class CsvBase:
             # strip 'container'
             csv_file = f'{csv_file[:-9]}.csv'
             log.debug(f'{self.__class__.__name__}.list: reading {csv_file} from {self._tar}')
+
             with TarFile(name=self._tar, mode='r') as tar:
                 file = TextIOWrapper(tar.extractfile(member=csv_file), encoding='utf-8')
+                if CSV_TO_UPPER:
+                    def upper_first_line(it):
+                        first_line = next(it)
+                        if WARN_LOWERCASE_HEADER and first_line != first_line.upper():
+                            logging.warning(f'found lowercase header in {csv_file}')
+                        return chain([first_line.upper()], it)
+                    file = upper_first_line(file)
                 csv_reader = DictReader(file, delimiter=',', doublequote=True, escapechar=None, quotechar='"',
                                         skipinitialspace=True, strict=True)
                 self._objects = [self.__class__.factory(o) for o in csv_reader]

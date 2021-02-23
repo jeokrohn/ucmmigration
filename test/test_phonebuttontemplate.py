@@ -89,6 +89,10 @@ class TestPbtAndPhone(ProxyTestCase):
                                             css=effective_css)
                     print(f'Da lookup for SD BLF "{sd_blf}" yields: "{lookup}"')
                     self.assertIsNotNone(lookup)
+                    self.assertIsInstance(lookup, list)
+                    self.assertEqual(len(lookup), 1)
+                    lookup = lookup[0]
+                    print(f'Da lookup for SD BLF "{sd_blf}" yields: "{lookup}"')
                     self.assertIsInstance(lookup, DnPattern)
                     lookup: DnPattern
                     phones_with_dn = self.proxy.phones.by_dn_and_partition.get(lookup.dn_and_partition)

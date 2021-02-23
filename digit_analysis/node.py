@@ -14,6 +14,8 @@ log = getLogger(__name__)
 traversal_log = getLogger(f'{__name__}.traversal')
 match_log = getLogger(f'{__name__}.match')
 
+MAX_TRANSLATION_DEPTH = 5
+
 
 class DaNode:
     """
@@ -120,6 +122,8 @@ class DaNode:
         # determine representation for new node
         # for something like "[1-9]" we need to collect everything until the closing bracket
         representation = digit
+        if not digit:
+            return '', set()
         if digit == '[':
             digits_matched = set()
             inner = takewhile(lambda x: x != ']', digits)
@@ -326,20 +330,6 @@ class DaNode:
         for node, _ in self.breadth_first_traversal_with_context(None):
             yield node
 
-        node_queue: Deque[DaNode] = deque()
-        node_queue.append(self)
-        while node_queue:
-            node = node_queue.popleft()
-            traversal_log.debug(f'breadth_first_traversal: yield {node.depth}:{node.full_representation}')
-            descend = yield node
-            traversal_log.debug(f'breadth_first_traversal: yield got {descend}')
-
-            if descend is None:
-                # descend into all child nodes
-                node_queue.extend(node.all_child_nodes)
-            else:
-                node_queue.extend(descend)
-
     def matching_nodes(self, digits: Union[str, Iterator[str]],
                        css: Union[str, Set[str]],
                        parent_digits: str = None,
@@ -350,7 +340,7 @@ class DaNode:
         :param css: CSS string
         :param parent_digits:
         :param parent_alternatives:
-        :return:
+        :return: Tuple of da node and match priority (the lower the better)
         """
         if isinstance(digits, str):
             digits = iter(digits)
@@ -358,8 +348,9 @@ class DaNode:
             css = set(css.split(':'))
         parent_digits = parent_digits or ''
         digit = next(digits, '')
-        match_log.debug(f'{self} digits {parent_digits}:{digit}')
-        parent_digits = f'{parent_digits}{digit}'
+        digit_repr, digit_set = self.repr_and_matching_set(digit=digit, digits=digits)
+        match_log.debug(f'{self} digits {parent_digits}:{digit_repr}')
+        parent_digits = f'{parent_digits}{digit_repr}'
         parent_alternatives = parent_alternatives * self.matching_digits
         if digit == '':
             # last digit consumed
@@ -370,18 +361,18 @@ class DaNode:
                 match_log.debug(f'matches({parent_digits}): reached end of digits: no terminal pattern {self}')
             return
         if self.representation == '!':
-            # match arbitrary digits -> consume further digits on this node w/o climbi
+            # match arbitrary digits -> consume further digits on this node w/o climbing down
             yield from self.matching_nodes(digits=digits, css=css, parent_digits=parent_digits,
                                            parent_alternatives=parent_alternatives)
             return
-
-        matching_childs = self.childs.get(digit, [])
+        matching_childs = set(chain.from_iterable(self.childs.get(d, []) for d in digit_set))
+        # matching_childs = self.childs.get(digit, [])
         # filter by CSS
         matching_childs = [mc
                            for mc in matching_childs
                            if css & mc.partitions]
         if not matching_childs:
-            match_log.debug(f'{self} no match on {digit}')
+            match_log.debug(f'{self} no match on {digit_repr}')
             return
 
         match_log.debug(f'{len(matching_childs)} matching childs: {", ".join(f"{mc}" for mc in matching_childs)}')
@@ -395,12 +386,13 @@ class DaNode:
             # for
         # if
 
-    def lookup(self, digits: str, css: Union[str, List, Set]) -> Optional[Pattern]:
+    def lookup(self, digits: str, css: str, tp_depth=0) -> List[Pattern]:
         """
         DA Lookup and return matched Pattern
         :param digits: digit string to consume
-        :param css: CSS
-        :return: pattern found as result of DA looku
+        :param css: string representation of the css; colon separated list of partition names
+        :param tp_depth: translation recursion depth
+        :return: pattern found as result of DA lookup
         """
         if isinstance(css, str):
             css_set = set(css.split(':'))
@@ -408,18 +400,43 @@ class DaNode:
             css_set = set(css)
         matches = list(self.matching_nodes(digits=digits, css=css))
         if not matches:
-            return None
+            return []
+        best_match_quality = min(m[1] for m in matches)
+        best_matches = [match[0]
+                        for match in matches
+                        if match[1] == best_match_quality]
+        # sorting by match priority makes sure that the best pattern(s) are at the start
         matches.sort(key=lambda x: x[1])
-        best_match = matches[0][0]
-        pattern = next(pattern
-                       for partition, pattern in best_match.terminal_pattern.items()
-                       if partition in css_set)
-        if isinstance(pattern, TranslationPattern):
-            # translate and try again
-            pattern: TranslationPattern
-            digits, css = pattern.translate(digits, css)
-            return self.lookup(digits, css)
-        return pattern
+        # best_match = matches[0][0]
+        # get all terminal patterns associated with these best matching nodes where the partition is part of the CSS
+        terminal_patterns = defaultdict(list)
+        for best_match in best_matches:
+            for partition, pattern in best_match.terminal_pattern.items():
+                if partition in css_set:
+                    terminal_patterns[partition].append(pattern)
+        if len(terminal_patterns) == 1:
+            patterns = next(iter(terminal_patterns.values()))
+        else:
+            # we have multiple patterns with the same matching quality in various partitions
+            # in that case the partition order in the CSS has to be used as a tie_breaker
+            # iterate through all partitions until terminal_patterns has an entry in that partition
+            patterns = next(patterns
+                            for partition in css.split(':')
+                            if (patterns := terminal_patterns.get(partition)) is not None)
+        # pattern is now a list of patterns that match
+        patterns_after_translation = []
+        for pattern in patterns:
+            if isinstance(pattern, TranslationPattern):
+                if tp_depth == MAX_TRANSLATION_DEPTH:
+                    continue
+                # translate and try again
+                pattern: TranslationPattern
+                digits, css = pattern.translate(digits, css)
+                if lookup_after_translation := self.lookup(digits, css, tp_depth=tp_depth + 1):
+                    patterns_after_translation.extend(lookup_after_translation)
+            else:
+                patterns_after_translation.append(pattern)
+        return patterns_after_translation
 
     def __str__(self):
         return f'{self.depth}:{self.full_representation}'
