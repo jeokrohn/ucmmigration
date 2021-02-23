@@ -776,10 +776,13 @@ class App:
             leaves = list(da_tree.find_leaves(depth=30,
                                               pattern_types={digit_analysis.PatternType.TP},
                                               partitions=combined_partitions))
+            combined_css = ':'.join(combined_partitions)
             for da_node, dial_string in leaves:
                 tps = [tp for tp in da_node.terminal_pattern.values() if isinstance(tp, digit_analysis.TranslationPattern)]
                 for tp in tps:
                     print(f'{dial_string}: {tp.pattern}')
-                    translated_dial_string, css = tp.translate(digits=tp.pattern.replace('.', ''), css=combined_partitions)
+                    lookup_result = da_tree.lookup(digits=dial_string,css=combined_css)
+                    print(f'Dial string {dial_string} lookup led to {lookup_result}')
+                    #translated_dial_string, css = tp.translate(digits=tp.pattern.replace('.', ''), css=combined_partitions)
                     foo = 1
         pass
