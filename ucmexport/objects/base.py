@@ -110,18 +110,23 @@ class CsvBase:
             log.debug(f'{self.__class__.__name__}.list: reading {csv_file} from {self._tar}')
 
             with TarFile(name=self._tar, mode='r') as tar:
-                file = TextIOWrapper(tar.extractfile(member=csv_file), encoding='utf-8')
-                if CSV_TO_UPPER:
-                    def upper_first_line(it):
-                        first_line = next(it)
-                        first_line_upper = first_line.upper()
-                        if WARN_LOWERCASE_HEADER and first_line != first_line_upper:
-                            logging.warning(f'found lowercase header in {csv_file}')
-                        return chain([first_line_upper], it)
-                    file = upper_first_line(file)
-                csv_reader = DictReader(file, delimiter=',', doublequote=True, escapechar=None, quotechar='"',
-                                        skipinitialspace=True, strict=True)
-                self._objects = [self.__class__.factory(o) for o in csv_reader]
+                try:
+                    file = TextIOWrapper(tar.extractfile(member=csv_file), encoding='utf-8')
+                except KeyError:
+                    # file not found
+                    self._objects = []
+                else:
+                    if CSV_TO_UPPER:
+                        def upper_first_line(it):
+                            first_line = next(it)
+                            first_line_upper = first_line.upper()
+                            if WARN_LOWERCASE_HEADER and first_line != first_line_upper:
+                                logging.warning(f'found lowercase header in {csv_file}')
+                            return chain([first_line_upper], it)
+                        file = upper_first_line(file)
+                    csv_reader = DictReader(file, delimiter=',', doublequote=True, escapechar=None, quotechar='"',
+                                            skipinitialspace=True, strict=True)
+                    self._objects = [self.__class__.factory(o) for o in csv_reader]
             log.debug(f'done reading {csv_file} from {self._tar}: {len(self._objects)} objects read')
         return self._objects
 
