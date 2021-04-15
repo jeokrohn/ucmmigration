@@ -42,6 +42,10 @@ class LineGroup(ObjBase):
     def name(self) -> str:
         return self.dict['NAME']
 
+    @property
+    def distribution_algorithm(self):
+        return self.type_distribution_algorithm
+
     def __str__(self):
         return self.name
 

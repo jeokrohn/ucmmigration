@@ -21,6 +21,11 @@ REMOVE_ATTR_FROM_PARENT = False
 
 
 def to_snail(key: str) -> str:
+    """
+    Convert a header ro snail case. For example: "JIM DOE" -> "jim_doe"
+    :param key: string to convert
+    :return: snail case version
+    """
     return RE_TO_SNAIL.sub('_', key).lower().strip('_')
 
 
@@ -109,9 +114,10 @@ class CsvBase:
                 if CSV_TO_UPPER:
                     def upper_first_line(it):
                         first_line = next(it)
-                        if WARN_LOWERCASE_HEADER and first_line != first_line.upper():
+                        first_line_upper = first_line.upper()
+                        if WARN_LOWERCASE_HEADER and first_line != first_line_upper:
                             logging.warning(f'found lowercase header in {csv_file}')
-                        return chain([first_line.upper()], it)
+                        return chain([first_line_upper], it)
                     file = upper_first_line(file)
                 csv_reader = DictReader(file, delimiter=',', doublequote=True, escapechar=None, quotechar='"',
                                         skipinitialspace=True, strict=True)

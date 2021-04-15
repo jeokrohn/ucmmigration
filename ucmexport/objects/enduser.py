@@ -90,7 +90,7 @@ class EndUser(ObjBase):
 
     @property
     def primary_extension(self) -> Optional[str]:
-        return self.primary_extensions['Primary']
+        return self.primary_extensions.get('Primary')
 
     @property
     def device_associations(self) -> List[DeviceAssociation]:
@@ -113,10 +113,10 @@ class EndUser(ObjBase):
         return self._device_associations
 
     @property
-    def cti_controlled(self)->List[DeviceAssociation]:
+    def cti_controlled(self) -> List[DeviceAssociation]:
         return [da
                 for da in self.device_associations
-                if da.type_association=='Cti Control In']
+                if da.type_association == 'Cti Control In']
 
 
 class EndUserContainer(CsvBase):

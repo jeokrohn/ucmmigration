@@ -1,12 +1,9 @@
 #!/usr/bin/env python
-from ucmexport import *
-import logging
 import glob
+import logging
 import os
 
 from app import App
-
-from time import perf_counter
 
 log = logging.getLogger(__name__)
 

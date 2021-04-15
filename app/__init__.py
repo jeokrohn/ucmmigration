@@ -786,3 +786,35 @@ class App:
                     #translated_dial_string, css = tp.translate(digits=tp.pattern.replace('.', ''), css=combined_partitions)
                     foo = 1
         pass
+
+    @menu_register('Dump Line groups')
+    def menu_line_group_dump(self):
+        users_by_pe = self.proxy.end_user.by_attribute('primary_extension')
+        users_by_pe.pop(None, None)
+        line_groups = self.proxy.line_group.list
+        for line_group in line_groups:
+            print(f'Line group "{line_group.name}"')
+            members = list(line_group.pattern_and_partition_set())
+            members.sort()
+            print(f' DNs: {", ".join(members)}')
+            users = list(chain.from_iterable(users_by_pe.get(m, []) for m in members))
+            users.sort()
+            if users:
+                print(f' Users by primary extension: {", ".join(u.user_id for u in users)}')
+            # collect all phones with any of these members as dn
+            phones = set(chain.from_iterable(self.proxy.phones.by_dn_and_partition.get(dnp, []) for dnp in members))
+            if phones:
+                print(f' phones: {", ".join(p.device_name for p in phones)}')
+            owners = list(set(p.owner for p in phones if p.owner))
+            owners.sort()
+            if owners:
+                print(f' owners: {", ".join(owners)}')
+            # users associated with these phones
+            user_ids = set(chain.from_iterable(phone.user_set for phone in phones))
+            # .. and we only want to look at users which actually exist as end users
+            users = [user for user_id in user_ids if (user := self.proxy.end_user.get(user_id))]
+            users: List[EndUser]
+            users.sort(key=lambda u: u.user_id)
+            if users:
+                print(f' users: {", ".join(u.user_id for u in users)}')
+
