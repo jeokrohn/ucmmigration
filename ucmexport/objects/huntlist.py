@@ -104,11 +104,7 @@ class HuntListContainer(CsvBase):
         self.line_group_container = line_group_container
 
     def __getitem__(self, item) -> HuntList:
-        try:
-            r = self.by_name[item][0]
-        except KeyError:
-            foo = 1
-        return r
+        return self.by_name[item][0]
 
     @property
     def list(self) -> List[HuntList]:
