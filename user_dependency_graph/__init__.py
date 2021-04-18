@@ -3,7 +3,6 @@ from collections import defaultdict
 import logging
 import networkx as nx
 import plotly.graph_objects as go
-from tqdm import tqdm
 from ucmexport import *
 
 from typing import Union, Set, Generator, Dict, List
@@ -475,4 +474,5 @@ class UserGraph(nx.Graph):
                             xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                             yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
                         )
+        fig.write_html('user dependencies.html')
         fig.show()
