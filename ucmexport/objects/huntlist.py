@@ -5,6 +5,8 @@ from re import compile
 from typing import Dict, List, Set
 from itertools import chain
 
+from .phone import Phone, PhoneContainer
+
 __all__ = ['HuntList', 'HuntListContainer', 'HuntListMember']
 
 
@@ -38,7 +40,7 @@ class HuntList(ObjBase):
 
     @property
     def description(self) -> str:
-        return self.dict['DESCRIPTON']
+        return self.dict['DESCRIPTION']
 
     @property
     def enabled(self) -> bool:
@@ -71,7 +73,7 @@ class HuntList(ObjBase):
                 d.pop(k)
         return self._members
 
-    def pattern_and_partition_set(self, hunt_list_container:'HuntListContainer') -> Set[str]:
+    def pattern_and_partition_set(self, hunt_list_container: 'HuntListContainer') -> Set[str]:
         """
         All pattern:partition values in all line groups of the hunt list
         :return: set of pattern:partition strings
@@ -86,6 +88,13 @@ class HuntList(ObjBase):
             r1 |= lg_container[line_group].pattern_and_partition_set()
         return r
 
+    def phones(self, hunt_list_container: 'HuntListContainer', phone_container: PhoneContainer) -> Set[Phone]:
+        """
+        All phones on which one of the DNPs is present
+        """
+        members = self.pattern_and_partition_set(hunt_list_container=hunt_list_container)
+        return set(chain.from_iterable(phone_container.by_dn_and_partition.get(dnp, []) for dnp in members))
+
 
 class HuntListContainer(CsvBase):
     factory = HuntList
@@ -95,7 +104,11 @@ class HuntListContainer(CsvBase):
         self.line_group_container = line_group_container
 
     def __getitem__(self, item) -> HuntList:
-        return self.by_name[item][0]
+        try:
+            r = self.by_name[item][0]
+        except KeyError:
+            foo = 1
+        return r
 
     @property
     def list(self) -> List[HuntList]:

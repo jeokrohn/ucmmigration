@@ -2,6 +2,9 @@ from .base import *
 
 from re import compile
 from collections import defaultdict
+from itertools import chain
+
+from .phone import PhoneContainer, Phone
 
 from typing import Dict, List, Set
 
@@ -79,6 +82,13 @@ class LineGroup(ObjBase):
         """
         return set([m.pattern_and_partition for m in self.members])
 
+    def phones(self, phone_container: PhoneContainer) -> Set[Phone]:
+        """
+        All phones on which one of the DNPs is present
+        """
+        members = self.pattern_and_partition_set()
+        return set(chain.from_iterable(phone_container.by_dn_and_partition.get(dnp, []) for dnp in members))
+
 
 class LineGroupContainer(CsvBase):
     factory = LineGroup
@@ -110,3 +120,4 @@ class LineGroupContainer(CsvBase):
                         result[item] |= others
             self._related_patterns_and_partitions = result
         return self._related_patterns_and_partitions
+

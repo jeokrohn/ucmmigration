@@ -787,11 +787,32 @@ class App:
                     foo = 1
         pass
 
-    @menu_register('Dump Line groups')
+    @menu_register('Dump call hunt info')
     def menu_line_group_dump(self):
+        # get hunt pilots
+        hunt_pilots = self.proxy.hunt_pilot.list
+        print('Hunt pilots:')
+        for hp in hunt_pilots:
+            dns = hp.pattern_and_partition_set(hunt_pilot_container=self.proxy.hunt_pilot)
+            phones = hp.phones(hunt_pilot_container=self.proxy.hunt_pilot, phone_container=self.proxy.phones)
+            print(f'{hp.pilot_and_partition}{"" if phones else " (no phones)"}, {hp.description}, hunt lists: '
+                  f'{", ".join(f"{hl}" for hl in hp.hunt_lists)}')
+
+        # list hunt lists
+        hunt_lists = self.proxy.hunt_list.list
+        print()
+        print('Hunt Lists')
+        for hl in hunt_lists:
+            phones = hl.phones(hunt_list_container=self.proxy.hunt_list, phone_container=self.proxy.phones)
+            dns = hl.pattern_and_partition_set(hunt_list_container=self.proxy.hunt_list)
+            members = hl.members
+            members.sort(key=lambda m: m.selection_order)
+            print(f'{hl.name}{"" if phones else " (no phones)"}, {hl.description}, members: {", ".join(f"{m}" for m in hl.members)}')
         users_by_pe = self.proxy.end_user.by_attribute('primary_extension')
         users_by_pe.pop(None, None)
         line_groups = self.proxy.line_group.list
+        print()
+        print('Line Groups')
         for line_group in line_groups:
             print(f'Line group "{line_group.name}"')
             members = list(line_group.pattern_and_partition_set())
@@ -802,7 +823,7 @@ class App:
             if users:
                 print(f' Users by primary extension: {", ".join(u.user_id for u in users)}')
             # collect all phones with any of these members as dn
-            phones = set(chain.from_iterable(self.proxy.phones.by_dn_and_partition.get(dnp, []) for dnp in members))
+            phones = line_group.phones(phone_container=self.proxy.phones)
             if phones:
                 print(f' phones: {", ".join(p.device_name for p in phones)}')
             owners = list(set(p.owner for p in phones if p.owner))

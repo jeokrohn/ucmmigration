@@ -7,6 +7,8 @@ from itertools import chain
 
 from typing import List, Dict, Set
 
+from .phone import Phone, PhoneContainer
+
 __all__ = ['HuntPilot', 'HuntPilotContainer', 'HuntPilotHuntList']
 
 
@@ -14,6 +16,22 @@ class HuntPilotHuntList(ObjBase):
     @property
     def hunt_list(self):
         return self.dict['HUNT LIST']
+
+    @property
+    def external_number_mask(self):
+        return self.dict['EXTERNAL NUMBER MASK']
+
+    @property
+    def max_callers(self):
+        return self.maximum_number_of_callers_in_queue
+
+    @property
+    def destination_queue_full(self):
+        return self.destination_when_queue_is_full
+
+    @property
+    def full_css(self):
+        return self.full_queue_calling_search_space
 
     def __str__(self):
         return self.hunt_list
@@ -73,8 +91,16 @@ class HuntPilot(ObjBase):
 
         r = set(chain.from_iterable(
             hunt_list_container[hunt_list].pattern_and_partition_set(hunt_list_container=hunt_list_container)
-            for hunt_list in hunt_lists))
+            for hunt_list in hunt_lists
+            if hunt_list))
         return r
+
+    def phones(self, hunt_pilot_container: 'HuntPilotContainer', phone_container: PhoneContainer) -> Set[Phone]:
+        """
+        All phones on which one of the DNPs is present
+        """
+        members = self.pattern_and_partition_set(hunt_pilot_container=hunt_pilot_container)
+        return set(chain.from_iterable(phone_container.by_dn_and_partition.get(dnp, []) for dnp in members))
 
 
 class HuntPilotContainer(CsvBase):
