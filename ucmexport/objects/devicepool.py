@@ -11,27 +11,27 @@ class DevicePool(ObjBase):
         return self.name
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self.device_pool_name
 
     @property
-    def region(self):
+    def region(self) -> str:
         return self.dict['Region']
 
     @property
-    def aar_css(self):
+    def aar_css(self) -> str:
         return self.aar_calling_search_space
 
     @property
-    def srst_reference(self):
+    def srst_reference(self) -> str:
         return self.dict['SRST REFÈRENCE']
 
     @property
-    def geo_location(self):
+    def geo_location(self) -> str:
         return self.dict['GEO LOCATION']
 
     @property
-    def physical_location(self):
+    def physical_location(self) -> str:
         return self.dict['PHYSICAL LOCATION']
 
 

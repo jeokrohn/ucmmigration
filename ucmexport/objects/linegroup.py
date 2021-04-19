@@ -25,7 +25,7 @@ class LineGroupMember(ObjBase):
         return self.route_partition
 
     @property
-    def pattern_and_partition(self):
+    def pattern_and_partition(self) -> str:
         return f'{self.dn_or_pattern}:{self.partition}'
 
     def __str__(self):
@@ -46,7 +46,7 @@ class LineGroup(ObjBase):
         return self.dict['NAME']
 
     @property
-    def distribution_algorithm(self):
+    def distribution_algorithm(self) -> str:
         return self.type_distribution_algorithm
 
     def __str__(self):

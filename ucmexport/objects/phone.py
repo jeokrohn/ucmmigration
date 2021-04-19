@@ -16,11 +16,11 @@ class Uri(ObjBase):
     """
 
     @property
-    def uri(self):
+    def uri(self) -> str:
         return self.on_directory_number
 
     @property
-    def route_partition(self):
+    def route_partition(self) -> str:
         return self.route_partition_on_directory_number
 
     def __str__(self):
@@ -95,11 +95,11 @@ SD_PATTERN = compile(r'SPEED DIAL (\w+) (\d+)')
 
 class SpeedDial(ObjBase):
     @property
-    def label(self):
+    def label(self) -> str:
         return self.dict['LABEL']
 
     @property
-    def number(self):
+    def number(self) -> str:
         return self.dict['NUMBER']
 
     def __str__(self):

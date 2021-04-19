@@ -23,7 +23,7 @@ class CallPark(ObjBase):
         return self.__getattr__('description')
 
     @property
-    def ucm(self)->str:
+    def ucm(self) -> str:
         return self.unified_callmanager
 
     def __str__(self):

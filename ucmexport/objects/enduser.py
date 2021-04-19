@@ -46,27 +46,27 @@ class EndUser(ObjBase):
         return self.user_id
 
     @property
-    def first_name(self):
+    def first_name(self) -> str:
         return self.dict['FIRST NAME']
 
     @property
-    def last_name(self):
+    def last_name(self) -> str:
         return self.__getattr__('last_name')
 
     @property
-    def user_id(self):
+    def user_id(self) -> str:
         return self.__getattr__('user_id')
 
     @property
-    def phone(self):
+    def phone(self) -> str:
         return self.telephone_number
 
     @property
-    def building(self):
+    def building(self) -> str:
         return self.__getattr__('building')
 
     @property
-    def site(self):
+    def site(self) -> str:
         return self.__getattr__('site')
 
     @property

@@ -12,23 +12,23 @@ __all__ = ['HuntPilot', 'HuntPilotContainer', 'HuntPilotHuntList']
 
 class HuntPilotHuntList(ObjBase):
     @property
-    def hunt_list(self):
+    def hunt_list(self) -> str:
         return self.dict['HUNT LIST']
 
     @property
-    def external_number_mask(self):
+    def external_number_mask(self) -> str:
         return self.dict['EXTERNAL NUMBER MASK']
 
     @property
-    def max_callers(self):
+    def max_callers(self) -> str:
         return self.maximum_number_of_callers_in_queue
 
     @property
-    def destination_queue_full(self):
+    def destination_queue_full(self) -> str:
         return self.destination_when_queue_is_full
 
     @property
-    def full_css(self):
+    def full_css(self) -> str:
         return self.full_queue_calling_search_space
 
     def __str__(self):

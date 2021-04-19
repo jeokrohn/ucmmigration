@@ -7,6 +7,7 @@ __all__ = ['TranslationPattern', 'TranslationPatternContainer', 'TP_UNLIMITED']
 
 TP_UNLIMITED = 100
 
+
 class TranslationPattern(ObjBase):
 
     @property

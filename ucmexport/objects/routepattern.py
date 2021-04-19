@@ -15,7 +15,7 @@ class RoutePattern(ObjBase):
         return self.route_partition
 
     @property
-    def pattern_and_partition(self):
+    def pattern_and_partition(self) -> str:
         return f'{self.pattern}:{self.partition}'
 
     def __str__(self):
