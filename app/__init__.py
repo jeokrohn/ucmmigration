@@ -839,22 +839,21 @@ class App:
                 phones |= device_profiles
                 if phones:
                     print(', phones or device profiles: ', end='')
-                    owners = []
+                    owners: List[List[str]] = []    # list of owners per phone
                     for phone_or_dp in phones:
                         if isinstance(phone_or_dp, Phone):
                             phone_or_dp: Phone
-                            owners.append(phone_or_dp.owner)
+                            owners.append([phone_or_dp.owner])
                         else:
+                            # for a device profile we need to find users with this device profile name set in
+                            # their device associations
                             phone_or_dp: DeviceProfile
-                            user = self.proxy.end_user.by_em_profile_name.get(phone_or_dp.device_profile_name)
-                            if user:
-                                owners.append(user.id)
-                            else:
-                                owners.append('')
-                    print(f"{', '.join(f'{phone} ({owner})' for phone, owner in zip(phones, owners))}", end='')
-                    owners = list(set(o for o in owners if o))
-                    owners.sort()
-                    print(f', owner(s): {", ".join(owners)}', end='')
+                            users = self.proxy.end_user.by_em_profile_name.get(phone_or_dp.device_profile_name, [])
+                            owners.append([user.id for user in users])
+                    print(', '.join(f'{phone} ({", ".join(users)})' for phone, users in zip(phones, owners)), end='')
+                    all_owners = list(set(chain.from_iterable(owners)))
+                    all_owners.sort()
+                    print(f', owner(s): {", ".join(all_owners)}', end='')
                 print()
             if False:
                 """
