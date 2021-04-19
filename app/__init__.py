@@ -808,34 +808,55 @@ class App:
             members = hl.members
             members.sort(key=lambda m: m.selection_order)
             print(f'{hl.name}{"" if phones else " (no phones)"}, {hl.description}, members: {", ".join(f"{m}" for m in hl.members)}')
-        users_by_pe = self.proxy.end_user.by_attribute('primary_extension')
+        users_by_pe: Dict[str, List[EndUser]] = self.proxy.end_user.by_attribute('primary_extension')
         users_by_pe.pop(None, None)
         line_groups = self.proxy.line_group.list
         print()
         print('Line Groups')
         for line_group in line_groups:
+            phones = line_group.phones(phone_container=self.proxy.phones)
+            if not phones:
+                # skip line groups w/o phones
+                continue
             print(f'Line group "{line_group.name}"')
             members = list(line_group.pattern_and_partition_set())
-            members.sort()
-            print(f' DNs: {", ".join(members)}')
-            users = list(chain.from_iterable(users_by_pe.get(m, []) for m in members))
-            users.sort()
-            if users:
-                print(f' Users by primary extension: {", ".join(u.user_id for u in users)}')
-            # collect all phones with any of these members as dn
-            phones = line_group.phones(phone_container=self.proxy.phones)
-            if phones:
-                print(f' phones: {", ".join(p.device_name for p in phones)}')
-            owners = list(set(p.owner for p in phones if p.owner))
-            owners.sort()
-            if owners:
-                print(f' owners: {", ".join(owners)}')
-            # users associated with these phones
-            user_ids = set(chain.from_iterable(phone.user_set for phone in phones))
-            # .. and we only want to look at users which actually exist as end users
-            users = [user for user_id in user_ids if (user := self.proxy.end_user.get(user_id))]
-            users: List[EndUser]
-            users.sort(key=lambda u: u.user_id)
-            if users:
-                print(f' users: {", ".join(u.user_id for u in users)}')
+            for dnp in members:
+                print(f'  DN: {dnp}', end='')
+                users_pe = users_by_pe.get(dnp)
+                if users_pe:
+                    print(f', primary extension for user(s) {", ".join(f"{u.user_id}" for u in users_pe)}', end='')
+                phones = self.proxy.phones.by_dn_and_partition.get(dnp)
+                if phones:
+                    print(', phones: ', end='')
+                    print(f"{', '.join(f'{phone.device_name} ({phone.owner.strip()})' for phone in phones)}", end='')
+                    owners = list(set(p.owner for p in phones if p.owner))
+                    owners.sort()
+                    print(f', owner(s): {", ".join(owners)}', end='')
+                print()
+            if False:
+                """
+                Deprecated output format
+                """
+
+                print(f' DNs: {", ".join(members)}')
+                users = list(chain.from_iterable(users_by_pe.get(m, []) for m in members))
+                users.sort()
+                if users:
+                    print(f' Users by primary extension: {", ".join(u.user_id for u in users)}')
+                # collect all phones with any of these members as dn
+                phones = line_group.phones(phone_container=self.proxy.phones)
+                if phones:
+                    print(f' phones: {", ".join(p.device_name for p in phones)}')
+                owners = list(set(p.owner for p in phones if p.owner))
+                owners.sort()
+                if owners:
+                    print(f' owners: {", ".join(owners)}')
+                # users associated with these phones
+                user_ids = set(chain.from_iterable(phone.user_set for phone in phones))
+                # .. and we only want to look at users which actually exist as end users
+                users = [user for user_id in user_ids if (user := self.proxy.end_user.get(user_id))]
+                users: List[EndUser]
+                users.sort(key=lambda u: u.user_id)
+                if users:
+                    print(f' users: {", ".join(u.user_id for u in users)}')
 
