@@ -6,7 +6,8 @@ import itertools
 
 from typing import List, Dict, Iterable, Set
 
-__all__ = ['Phone', 'PhoneContainer', 'BusyLampField', 'SpeedDial', 'Line', 'Uri', 'PhoneDict']
+__all__ = ['Phone', 'PhoneContainer', 'BusyLampField', 'SpeedDial', 'Line', 'Uri', 'PhoneDict',
+           'CommonPhoneAndDeviceProfileContainer', 'CommonPhoneAndDeviceProfile']
 
 
 class Uri(ObjBase):
@@ -151,9 +152,12 @@ class BusyLampField(ObjBase):
 ATTRIBUTE_PATTERN = compile(r'(.+) (\d+)')
 
 
-class Phone(ObjBase):
+class CommonPhoneAndDeviceProfile(ObjBase):
+    """
+    Commonalities of Phone and DeviceProfile
+    """
     def __init__(self, o: Dict):
-        super(Phone, self).__init__(o)
+        super().__init__(o)
         self._lines = None
         self._speed_dials = None
         self._blfs = None
@@ -249,35 +253,12 @@ class Phone(ObjBase):
                 d.pop(k)
         return self._blfs
 
-    def __str__(self):
-        return self.device_name
-
     def __lt__(self, other):
         return str(self) < str(other)
 
     @property
-    def device_name(self):
-        return self.dict['DEVICE NAME']
-
-    @property
-    def device_pool(self):
-        return self.dict['DEVICE POOL']
-
-    @property
     def device_type(self):
         return self.dict['DEVICE TYPE']
-
-    @property
-    def css(self):
-        return self.dict.get('CSS')
-
-    @property
-    def aar_css(self):
-        return self.dict.get('AAR CSS')
-
-    @property
-    def location(self):
-        return self.dict.get('LOCATION')
 
     @property
     def phone_button_template(self):
@@ -293,10 +274,6 @@ class Phone(ObjBase):
             return True
         else:
             return False
-
-    @property
-    def owner(self) -> str:
-        return self.owner_user_id
 
     def user_id(self, index: int) -> str:
         return self.__getattr__(f'user_id_{index}')
@@ -321,75 +298,89 @@ class Phone(ObjBase):
     @property
     def user_set(self) -> Set[str]:
         """
+        all user ids referenced on the phone or profile: USER ID X
+        :return: set of user IDs
+        """
+        return set(self.user_ids)
+
+
+class Phone(CommonPhoneAndDeviceProfile):
+    def __init__(self, o: Dict):
+        super().__init__(o)
+
+    def __str__(self):
+        return self.device_name
+
+    @property
+    def device_name(self):
+        return self.dict['DEVICE NAME']
+
+    @property
+    def device_pool(self):
+        return self.dict['DEVICE POOL']
+
+    @property
+    def css(self):
+        return self.dict.get('CSS')
+
+    @property
+    def aar_css(self):
+        return self.dict.get('AAR CSS')
+
+    @property
+    def location(self):
+        return self.dict.get('LOCATION')
+
+    @property
+    def owner(self) -> str:
+        return self.owner_user_id
+
+    @property
+    def user_set(self) -> Set[str]:
+        """
         all user ids referenced on the phone: owner and USER ID X
         :return: set of user IDs
         """
-        return set(u for u in itertools.chain([self.owner], self.user_ids) if u)
+        us = super().user_set
+        if self.owner:
+            us.add(self.owner)
+        return us
 
 
-PhoneDict = Dict[str, List[Phone]]
+PhoneAndDevicePoolDict = Dict[str, List[CommonPhoneAndDeviceProfile]]
 
 
-class PhoneContainer(CsvBase):
-    factory = Phone
-
+class CommonPhoneAndDeviceProfileContainer(CsvBase):
+    """
+    Commonalities of Phone and Device Profile Container
+    """
     def __init__(self, tar: str):
-        super(PhoneContainer, self).__init__(tar)
+        super().__init__(tar)
         self._line_related_patterns_and_partitions = None
         self._by_user_id = None
         self._by_dn_and_partition = None
         self._by_call_pickup_group = None
 
     @property
-    def by_device_name(self) -> PhoneDict:
-        return self.by_attribute('device_name')
-
-    def __getitem__(self, item) -> Phone:
-        return self.by_device_name[item][0]
-
-    @property
-    def list(self) -> List[Phone]:
-        return super(PhoneContainer, self).list
-
-    @property
-    def by_device_type(self) -> PhoneDict:
+    def by_device_type(self) -> PhoneAndDevicePoolDict:
         return self.by_attribute('device_type')
 
     @property
-    def by_device_pool(self) -> PhoneDict:
-        return self.by_attribute('device_pool')
-
-    @property
-    def by_owner(self) -> PhoneDict:
-        return self.by_attribute('owner')
-
-    @property
-    def by_user_id(self) -> PhoneDict:
+    def by_user_id(self) -> PhoneAndDevicePoolDict:
         """
-        Phones indexed by user ids
+        indexed by user ids
         :return:
         """
         if self._by_user_id is None:
-            d: PhoneDict = defaultdict(list)
+            d: PhoneAndDevicePoolDict = defaultdict(list)
             for phone in self.list:
                 for user_id in phone.user_set:
                     d[user_id].append(phone)
             self._by_user_id = d
         return self._by_user_id
 
-    def with_owner(self) -> Iterable[Phone]:
-        p: Phone
-        return (p for p in self.list if p.owner)
-
-    def without_owner(self) -> Iterable[Phone]:
-        p: Phone
-        return (p for p in self.list if not p.owner)
-
-    def with_uri(self) -> Iterable[Phone]:
-        return (p for p in self.list if p.has_uri)
-
     @property
-    def by_dn_and_partition(self) -> Dict[str, Set[Phone]]:
+    def by_dn_and_partition(self) -> PhoneAndDevicePoolDict:
         """
         Get sets of phones indexed by dn:partition provisioned on these phones
         :return: dict of sets of phones indexed by dn:partition provisioned on these phones
@@ -403,7 +394,7 @@ class PhoneContainer(CsvBase):
         return self._by_dn_and_partition
 
     @property
-    def by_call_pickup_group(self) -> Dict[str, Set[Phone]]:
+    def by_call_pickup_group(self) -> PhoneAndDevicePoolDict:
         """
         Get sets of phones indexed by call pickup groups provisioned on lines of these phones
         :return: dict of sets of phones indexed by call pickup group name
@@ -419,6 +410,62 @@ class PhoneContainer(CsvBase):
                     result[cpg].add(phone)
             self._by_call_pickup_group = dict(result)
         return self._by_call_pickup_group
+
+
+PhoneDict = Dict[str, List[Phone]]
+
+
+class PhoneContainer(CommonPhoneAndDeviceProfileContainer):
+    factory = Phone
+
+    def __init__(self, tar: str):
+        super(PhoneContainer, self).__init__(tar)
+
+    @property
+    def by_device_name(self) -> PhoneDict:
+        return self.by_attribute('device_name')
+
+    def __getitem__(self, item) -> Phone:
+        return self.by_device_name[item][0]
+
+    @property
+    def list(self) -> List[Phone]:
+        return super(PhoneContainer, self).list
+
+    @property
+    def by_device_pool(self) -> PhoneDict:
+        return self.by_attribute('device_pool')
+
+    @property
+    def by_device_type(self) -> PhoneDict:
+        return super().by_device_type
+
+    @property
+    def by_owner(self) -> PhoneDict:
+        return self.by_attribute('owner')
+
+    @property
+    def by_user_id(self) -> PhoneDict:
+        return super().by_user_id
+
+    def with_owner(self) -> Iterable[Phone]:
+        p: Phone
+        return (p for p in self.list if p.owner)
+
+    def without_owner(self) -> Iterable[Phone]:
+        p: Phone
+        return (p for p in self.list if not p.owner)
+
+    def with_uri(self) -> Iterable[Phone]:
+        return (p for p in self.list if p.has_uri)
+
+    @property
+    def by_dn_and_partition(self) -> PhoneDict:
+        return super().by_dn_and_partition
+
+    @property
+    def by_call_pickup_group(self) -> PhoneDict:
+        return super().by_call_pickup_group
 
     def related_lines(self) -> DNAandPartitionRelated:
         """

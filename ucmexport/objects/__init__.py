@@ -11,6 +11,7 @@ from .remotedestination import *
 from .phonebuttontemplate import *
 from .directedcallpark import *
 from .callpickupgroup import *
-from .callpark  import *
+from .callpark import *
 from .routepattern import *
 from .translationpattern import *
+from .deviceprofile import *

@@ -24,6 +24,7 @@ class Proxy:
         self.remote_destination = RemoteDestinationContainer(tar)
         self.route_pattern = RoutePatternContainer(tar)
         self.translation_pattern = TranslationPatternContainer(tar)
+        self.device_profile = DeviceProfileContainer(tar)
 
         self._dn_partition_by_enduser = None
 

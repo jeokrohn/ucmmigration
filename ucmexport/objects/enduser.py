@@ -70,6 +70,15 @@ class EndUser(ObjBase):
         return self.__getattr__('site')
 
     @property
+    def em_profile_name(self) -> Optional[str]:
+        """
+        extension mobility profile if available
+        """
+        return next((da.device_name
+                     for da in self.device_associations
+                     if da.type_association == 'Profile Available'), None)
+
+    @property
     def primary_extensions(self) -> Dict[str, PrimaryExtension]:
         if self._primary_extensions is None:
             i = 0
@@ -125,6 +134,10 @@ class EndUserContainer(CsvBase):
     @property
     def list(self) -> List[EndUser]:
         return super(EndUserContainer, self).list
+
+    @property
+    def by_em_profile_name(self) -> Dict[str, List[EndUser]]:
+        return self.by_attribute('em_profile_name')
 
     def __getitem__(self, item) -> EndUser:
         return self.by_user_id[item][0]

@@ -8,8 +8,6 @@ import plotly.graph_objects as go
 import plotly.express as px
 import digit_analysis
 
-from time import perf_counter
-
 __all__ = ['App']
 
 log = logging.getLogger(__name__)
@@ -702,7 +700,7 @@ class App:
 
     @menu_register('Dial Plan Analysis')
     def menu_dial_plan_analysis(self):
-        da_tree = digit_analysis.DaNode.from_proxy(self.proxy,first_line_only=True)
+        da_tree = digit_analysis.DaNode.from_proxy(self.proxy, first_line_only=True)
         # after adding all patterns we now want to find out how to dial on-net
         # traverse the tree breadth first and consider all sub trees which potentially can get us to a DN
         # - only TPs and DNs
@@ -778,12 +776,14 @@ class App:
                                               partitions=combined_partitions))
             combined_css = ':'.join(combined_partitions)
             for da_node, dial_string in leaves:
-                tps = [tp for tp in da_node.terminal_pattern.values() if isinstance(tp, digit_analysis.TranslationPattern)]
+                tps = [tp
+                       for tp in da_node.terminal_pattern.values()
+                       if isinstance(tp, digit_analysis.TranslationPattern)]
                 for tp in tps:
                     print(f'{dial_string}: {tp.pattern}')
-                    lookup_result = da_tree.lookup(digits=dial_string,css=combined_css)
+                    lookup_result = da_tree.lookup(digits=dial_string, css=combined_css)
                     print(f'Dial string {dial_string} lookup led to {lookup_result}')
-                    #translated_dial_string, css = tp.translate(digits=tp.pattern.replace('.', ''), css=combined_partitions)
+                    # translated_dial_string, css = tp.translate(digits=tp.pattern.replace('.', ''), css=combined_partitions)
                     foo = 1
         pass
 
@@ -793,8 +793,11 @@ class App:
         hunt_pilots = self.proxy.hunt_pilot.list
         print('Hunt pilots:')
         for hp in hunt_pilots:
-            dns = hp.pattern_and_partition_set(hunt_pilot_container=self.proxy.hunt_pilot)
-            phones = hp.phones(hunt_pilot_container=self.proxy.hunt_pilot, phone_container=self.proxy.phones)
+            phones = hp.phones_or_device_profiles(hunt_pilot_container=self.proxy.hunt_pilot,
+                                                  container=self.proxy.phones)
+            device_profiles = hp.phones_or_device_profiles(hunt_pilot_container=self.proxy.hunt_pilot,
+                                                           container=self.proxy.device_profile)
+            phones |= device_profiles
             print(f'{hp.pilot_and_partition}{"" if phones else " (no phones)"}, {hp.description}, hunt lists: '
                   f'{", ".join(f"{hl}" for hl in hp.hunt_lists)}')
 
@@ -803,18 +806,24 @@ class App:
         print()
         print('Hunt Lists')
         for hl in hunt_lists:
-            phones = hl.phones(hunt_list_container=self.proxy.hunt_list, phone_container=self.proxy.phones)
-            dns = hl.pattern_and_partition_set(hunt_list_container=self.proxy.hunt_list)
+            phones = hl.phones_or_device_profiles(hunt_list_container=self.proxy.hunt_list,
+                                                  container=self.proxy.phones)
+            device_profiles = hl.phones_or_device_profiles(hunt_list_container=self.proxy.hunt_list,
+                                                           container=self.proxy.device_profile)
+            phones |= device_profiles
             members = hl.members
             members.sort(key=lambda m: m.selection_order)
-            print(f'{hl.name}{"" if phones else " (no phones)"}, {hl.description}, members: {", ".join(f"{m}" for m in hl.members)}')
+            print(f'{hl.name}{"" if phones else " (no phones)"}, {hl.description}, '
+                  f'members: {", ".join(f"{m}" for m in hl.members)}')
         users_by_pe: Dict[str, List[EndUser]] = self.proxy.end_user.by_attribute('primary_extension')
         users_by_pe.pop(None, None)
         line_groups = self.proxy.line_group.list
         print()
         print('Line Groups')
         for line_group in line_groups:
-            phones = line_group.phones(phone_container=self.proxy.phones)
+            phones = line_group.phones_or_device_profiles(container=self.proxy.phones)
+            device_profiles = line_group.phones_or_device_profiles(container=self.proxy.device_profile)
+            phones |= device_profiles
             if not phones:
                 # skip line groups w/o phones
                 continue
@@ -825,11 +834,25 @@ class App:
                 users_pe = users_by_pe.get(dnp)
                 if users_pe:
                     print(f', primary extension for user(s) {", ".join(f"{u.user_id}" for u in users_pe)}', end='')
-                phones = self.proxy.phones.by_dn_and_partition.get(dnp)
+                phones = self.proxy.phones.by_dn_and_partition.get(dnp, set())
+                device_profiles = self.proxy.device_profile.by_dn_and_partition.get(dnp, set())
+                phones |= device_profiles
                 if phones:
-                    print(', phones: ', end='')
-                    print(f"{', '.join(f'{phone.device_name} ({phone.owner.strip()})' for phone in phones)}", end='')
-                    owners = list(set(p.owner for p in phones if p.owner))
+                    print(', phones or device profiles: ', end='')
+                    owners = []
+                    for phone_or_dp in phones:
+                        if isinstance(phone_or_dp, Phone):
+                            phone_or_dp: Phone
+                            owners.append(phone_or_dp.owner)
+                        else:
+                            phone_or_dp: DeviceProfile
+                            user = self.proxy.end_user.by_em_profile_name.get(phone_or_dp.device_profile_name)
+                            if user:
+                                owners.append(user.id)
+                            else:
+                                owners.append('')
+                    print(f"{', '.join(f'{phone} ({owner})' for phone, owner in zip(phones, owners))}", end='')
+                    owners = list(set(o for o in owners if o))
                     owners.sort()
                     print(f', owner(s): {", ".join(owners)}', end='')
                 print()
@@ -859,4 +882,3 @@ class App:
                 users.sort(key=lambda u: u.user_id)
                 if users:
                     print(f' users: {", ".join(u.user_id for u in users)}')
-

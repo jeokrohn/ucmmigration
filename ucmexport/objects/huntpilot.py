@@ -1,13 +1,11 @@
-from .base import *
-from .huntlist import HuntListContainer
-
-from re import compile
 from collections import defaultdict
 from itertools import chain
-
+from re import compile
 from typing import List, Dict, Set
 
-from .phone import Phone, PhoneContainer
+from .base import *
+from .huntlist import HuntListContainer
+from .phone import CommonPhoneAndDeviceProfileContainer, CommonPhoneAndDeviceProfile
 
 __all__ = ['HuntPilot', 'HuntPilotContainer', 'HuntPilotHuntList']
 
@@ -95,12 +93,13 @@ class HuntPilot(ObjBase):
             if hunt_list))
         return r
 
-    def phones(self, hunt_pilot_container: 'HuntPilotContainer', phone_container: PhoneContainer) -> Set[Phone]:
+    def phones_or_device_profiles(self, hunt_pilot_container: 'HuntPilotContainer',
+                                  container: CommonPhoneAndDeviceProfileContainer) -> Set[CommonPhoneAndDeviceProfile]:
         """
-        All phones on which one of the DNPs is present
+        All phones or device profiles on which one of the DNPs is present
         """
         members = self.pattern_and_partition_set(hunt_pilot_container=hunt_pilot_container)
-        return set(chain.from_iterable(phone_container.by_dn_and_partition.get(dnp, []) for dnp in members))
+        return set(chain.from_iterable(container.by_dn_and_partition.get(dnp, []) for dnp in members))
 
 
 class HuntPilotContainer(CsvBase):

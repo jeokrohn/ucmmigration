@@ -5,7 +5,7 @@ from re import compile
 from typing import Dict, List, Set
 from itertools import chain
 
-from .phone import Phone, PhoneContainer
+from .phone import CommonPhoneAndDeviceProfile, CommonPhoneAndDeviceProfileContainer
 
 __all__ = ['HuntList', 'HuntListContainer', 'HuntListMember']
 
@@ -88,12 +88,13 @@ class HuntList(ObjBase):
             r1 |= lg_container[line_group].pattern_and_partition_set()
         return r
 
-    def phones(self, hunt_list_container: 'HuntListContainer', phone_container: PhoneContainer) -> Set[Phone]:
+    def phones_or_device_profiles(self, hunt_list_container: 'HuntListContainer',
+                                  container: CommonPhoneAndDeviceProfileContainer) -> Set[CommonPhoneAndDeviceProfile]:
         """
         All phones on which one of the DNPs is present
         """
         members = self.pattern_and_partition_set(hunt_list_container=hunt_list_container)
-        return set(chain.from_iterable(phone_container.by_dn_and_partition.get(dnp, []) for dnp in members))
+        return set(chain.from_iterable(container.by_dn_and_partition.get(dnp, []) for dnp in members))
 
 
 class HuntListContainer(CsvBase):
