@@ -828,9 +828,12 @@ class App:
                 # skip line groups w/o phones
                 continue
             print(f'Line group "{line_group.name}"')
-            members = list(line_group.pattern_and_partition_set())
-            for dnp in members:
-                print(f'  DN: {dnp}', end='')
+            lg_members = line_group.members
+            # sort by selection order
+            lg_members.sort(key=lambda m: m.selection_order)
+            for lg_member in lg_members:
+                dnp = lg_member.pattern_and_partition
+                print(f'  {lg_member.selection_order}) DN: {dnp}', end='')
                 users_pe = users_by_pe.get(dnp)
                 if users_pe:
                     print(f', primary extension for user(s) {", ".join(f"{u.user_id}" for u in users_pe)}', end='')
