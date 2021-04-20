@@ -59,6 +59,10 @@ class HuntPilot(ObjBase):
     def pilot_and_partition(self) -> str:
         return f'{self.hunt_pilot}:{self.partition}'
 
+    @property
+    def routethis_pattern(self) -> bool:
+        return self.dict['ROUTETHIS PATTERN'] == 't'
+
     def __str__(self):
         return self.pilot_and_partition
 
