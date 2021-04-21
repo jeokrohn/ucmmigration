@@ -11,8 +11,6 @@ ATTRIBUTE_PATTERN = compile(r'(.+) (\d+)')
 
 
 class DeviceProfile(CommonPhoneAndDeviceProfile):
-    def __init__(self, o: Dict):
-        super().__init__(o)
 
     def __str__(self):
         return self.device_profile_name
@@ -27,9 +25,6 @@ DPDict = Dict[str, List[DeviceProfile]]
 
 class DeviceProfileContainer(CommonPhoneAndDeviceProfileContainer):
     factory = DeviceProfile
-
-    def __init__(self, tar: str):
-        super().__init__(tar)
 
     @property
     def by_dp_name(self) -> DPDict:

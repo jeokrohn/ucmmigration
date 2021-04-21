@@ -15,3 +15,5 @@ from .callpark import *
 from .routepattern import *
 from .translationpattern import *
 from .deviceprofile import *
+from .location import *
+from .locationedge import *
