@@ -852,7 +852,8 @@ class App:
                             # their device associations
                             phone_or_dp: DeviceProfile
                             users = self.proxy.end_user.by_em_profile_name.get(phone_or_dp.device_profile_name, [])
-                            owners.append([user.id for user in users])
+                            owners.append([user.user_id for user in users])
+
                     print(', '.join(f'{phone} ({", ".join(users)})' for phone, users in zip(phones, owners)), end='')
                     all_owners = list(set(chain.from_iterable(owners)))
                     all_owners.sort()
