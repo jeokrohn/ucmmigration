@@ -68,6 +68,11 @@ class UserGraph(nx.Graph):
             p_node = node
 
     def related_users_hunt_pilot(self, proxy: Proxy) -> int:
+        """
+        Add user relations to graph: users related via hunt pilot
+        :param proxy:
+        :return:
+        """
         print('Related users based on hunt pilots...')
         users_added = 0
         for hunt_pilot in proxy.hunt_pilot.list:
@@ -80,12 +85,13 @@ class UserGraph(nx.Graph):
             # finally get all users associated with these phones
             user_ids = set(chain.from_iterable(phone.user_set for phone in phones))
             # .. and we only want to look at users which actually exist as end users
-            users = [user for user_id in user_ids if (user := proxy.end_user.get(user_id))]
+            users = [user for user_id in user_ids
+                     if (user := proxy.end_user.get(user_id))]
             if len(users) < 2:
                 continue
+            # add node for hunt pilot to graph
             self.add_node(hp_node)
-            # create links
-            # hp-user
+            # now for each user add a node and create a link between hunt pilot and user
             for user in users:
                 un = self.user_node(user)
                 self.add_node(un)
@@ -96,6 +102,12 @@ class UserGraph(nx.Graph):
         return users_added
 
     def related_users_shared_phones(self, proxy: Proxy, only_new_relations=False) -> int:
+        """
+        Find users that are related based on shared phones
+        :param proxy:
+        :param only_new_relations:
+        :return: number of related users
+        """
         users_added = 0
         print('Related users based on shared phones...')
         for phone in proxy.phones.list:

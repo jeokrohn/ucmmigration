@@ -197,6 +197,9 @@ class App:
         self.toggle_check(self.USER_RELATION_CPG)
 
     def assert_user_graph(self):
+        """
+        Assert that the user graph has been created.
+        """
         if self.user_graph is not None:
             return
         self.user_graph = UserGraph()
