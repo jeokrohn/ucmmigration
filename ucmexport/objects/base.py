@@ -100,6 +100,15 @@ class CsvBase:
 
     @property
     def list(self) -> List[ObjBase]:
+        def progress(items):
+            print(f'reading {self.factory.__name__}s from {csv_file}', end='', flush=True)
+            i = 0
+            for i, e in enumerate(items):
+                if i % 200 == 0:
+                    print('.', end='', flush=True)
+                yield e
+            print(f', got {i + 1} {self.factory.__name__}s')
+
         if self._objects is None:
             # read from CSV. Determine CSV file name from class name
             # class names are assumed to be <csv file name>Container
@@ -126,7 +135,7 @@ class CsvBase:
                         file = upper_first_line(file)
                     csv_reader = DictReader(file, delimiter=',', doublequote=True, escapechar=None, quotechar='"',
                                             skipinitialspace=True, strict=True)
-                    self._objects = [self.__class__.factory(o) for o in csv_reader]
+                    self._objects = [self.__class__.factory(o) for o in progress(csv_reader)]
             log.debug(f'done reading {csv_file} from {self._tar}: {len(self._objects)} objects read')
         return self._objects
 

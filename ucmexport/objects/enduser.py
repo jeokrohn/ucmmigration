@@ -38,6 +38,8 @@ class DeviceAssociation:
 
 class EndUser(ObjBase):
     def __init__(self, o: Dict):
+        # remove empty columns
+        o = {k: v for k, v in o.items() if v}
         super(EndUser, self).__init__(o)
         self._primary_extensions = None
         self._device_associations = None

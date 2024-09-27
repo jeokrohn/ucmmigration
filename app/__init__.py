@@ -574,7 +574,10 @@ class App:
         for phone in relevant_phones:
             user_id = list(phone.user_set)[0]
             user = self.proxy.end_user[user_id]
-            user_phone_number = user.phone.replace(' ', '')
+            try:
+                user_phone_number = user.phone.replace(' ', '')
+            except AttributeError:
+                user_phone_number = None
             if not user_phone_number:
                 user_phone_number = 'empty'
 
