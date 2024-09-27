@@ -437,6 +437,20 @@ class App:
             output = ', '.join(f'{phone.device_name}({dn_and_partition1(phone)})' for phone in phones)
             print(f'{user}: {output}')
 
+    @menu_register('Users with more than 10 phones')
+    def menu_users_with_phone_count(self):
+        phones_per_user: dict[str, List[Phone]] = defaultdict(list)
+        for ph in self.proxy.phones.list:
+            for user in ph.user_set:
+                phones_per_user[user].append(ph)
+        user_phone_count = {user: len(phones) for user, phones in phones_per_user.items()}
+        user_phone_count = sorted(user_phone_count.items(), key=lambda x: x[1], reverse=True)
+        print('Users with more than 10 phones:')
+        for user, phone_count in user_phone_count:
+            if phone_count < 10:
+                continue
+            print(f'{user}: {phone_count}')
+
     @menu_register('External phone number masks')
     def menu_external_phone_number_masks(self):
         phones_by_mask: Dict[str, List[Phone]] = defaultdict(list)

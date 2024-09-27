@@ -38,6 +38,17 @@ class UserGraph(nx.Graph):
             return f'CPG {cpg}'
         return f'CPG {cpg.name}'
 
+    @staticmethod
+    def ignore_uid(proxy:Proxy)->set[str]:
+        # we want to ignore users that own an excessive number of phones
+        phones_per_user: dict[str, int] = defaultdict(int)
+        for phone in proxy.phones.list:
+            for user in phone.user_set:
+                phones_per_user[user] += 1
+        ignore_uid = {uid for uid, count in phones_per_user.items() if count > 20}
+        print(f'ignoring {len(ignore_uid)} users with more than 20 phones: {", ".join(sorted(ignore_uid))}')
+        return ignore_uid
+
     def connected_user_nodes(self, node: str) -> Set[str]:
         """
         Determine all user nodes connected to given node
@@ -75,6 +86,7 @@ class UserGraph(nx.Graph):
         """
         print('Related users based on hunt pilots...')
         users_added = 0
+        ignore_uid = self.ignore_uid(proxy)
         for hunt_pilot in proxy.hunt_pilot.list:
             hp_node = self.hunt_pilot_node(hunt_pilot)
             # all patterns:partitions on all line groups
@@ -84,6 +96,7 @@ class UserGraph(nx.Graph):
             phones = set(chain.from_iterable(proxy.phones.by_dn_and_partition.get(dnp, []) for dnp in dnps))
             # finally get all users associated with these phones
             user_ids = set(chain.from_iterable(phone.user_set for phone in phones))
+            user_ids -= ignore_uid
             # .. and we only want to look at users which actually exist as end users
             users = [user for user_id in user_ids
                      if (user := proxy.end_user.get(user_id))]
@@ -110,11 +123,12 @@ class UserGraph(nx.Graph):
         """
         users_added = 0
         print('Related users based on shared phones...')
+        ignore_uid = self.ignore_uid(proxy)
         for phone in proxy.phones.list:
             # only consider actually existing end users
             user_node_set = {self.user_node(user)
                              for uid in phone.user_set
-                             if (user := proxy.end_user.get(uid))}
+                             if (uid not in ignore_uid) and (user := proxy.end_user.get(uid))}
             if len(user_node_set) < 2:
                 continue
             # no need to add if all users are already connected
@@ -139,23 +153,27 @@ class UserGraph(nx.Graph):
                                    only_first_dnp=True,
                                    only_new_relations=False) -> int:
         print('Related users based on shared lines...')
+        ignore_uid = self.ignore_uid(proxy)
+
         # get all users and the user's DNs from the users phones
         phones_by_user_id = proxy.phones.by_user_id
         dnps_by_user_id = {user_id: dnps
                            for user_id, phones in phones_by_user_id.items()
-                           if (dnps := chain.from_iterable((line.dn_and_partition
+                           if ((user_id not in ignore_uid) and
+                               (dnps := chain.from_iterable((line.dn_and_partition
                                                             for line in phone.lines.values())
-                                                           for phone in phones))}
+                                                           for phone in phones)))}
         # for each user id and DN get phones with different users
         phones_by_dn_and_partition = proxy.phones.by_dn_and_partition
         phones_other_users_by_user_and_dnp = {user_id: phones_other_users_by_dn
                                               for user_id, dnps in dnps_by_user_id.items()
-                                              if (phones_other_users_by_dn :=
+                                              if ((user_id not in ignore_uid) and
+                                                  (phones_other_users_by_dn :=
                                                   {dnp: phones
                                                    for dnp in dnps
                                                    if (phones := [phone
                                                                   for phone in phones_by_dn_and_partition[dnp]
-                                                                  if phone.user_set - {user_id}])})}
+                                                                  if (phone.user_set - {user_id} - ignore_uid)])}))}
 
         users_added = 0
         for user_id, phones_other_user_by_dnp in phones_other_users_by_user_and_dnp.items():
@@ -163,6 +181,7 @@ class UserGraph(nx.Graph):
                                                                       for phone in phones)
                                                   for phones in phones_other_user_by_dnp.values()))
             other_users -= {user_id}
+            other_users -= ignore_uid
             # we don't need to look at users that are already connected
             if only_new_relations:
                 connected_users = self.connected_user_ids(user_id)
@@ -278,7 +297,10 @@ class UserGraph(nx.Graph):
         print('related users based on BLF...')
         users_added = 0
         phones_by_user_id = proxy.phones.by_user_id
+        ignore_uuid = self.ignore_uid(proxy)
         for user_id in phones_by_user_id:
+            if user_id in ignore_uuid:
+                continue
             if proxy.end_user.get(user_id) is None:
                 log.warning(f'user {user_id} does not exist')
                 continue
@@ -290,6 +312,8 @@ class UserGraph(nx.Graph):
                     for monitored_phone in monitored_phones:
                         monitored_user_ids = monitored_phone.user_set
                         for monitored_user_id in monitored_user_ids:
+                            if monitored_user_id in ignore_uuid:
+                                continue
                             if monitored_user_id == user_id:
                                 continue
                             if (monitored_user := proxy.end_user.get(monitored_user_id)) is None:
@@ -337,6 +361,7 @@ class UserGraph(nx.Graph):
         by_cpg = proxy.phones.by_call_pickup_group
         users_added = set()
         related_users_count = 0
+        ignore_uid = self.ignore_uid(proxy)
         for cpg_name, phones in by_cpg.items():
             # users related via this cpg is the union of all users of all phones related to this cpg
             user_set = sorted(set(chain.from_iterable(phone.user_set
@@ -349,6 +374,8 @@ class UserGraph(nx.Graph):
             for phone in phones:
                 phone_node = self.phone_node(phone)
                 for user in phone.user_set:
+                    if user in ignore_uid:
+                        continue
                     if user in users_added:
                         continue
                     self.add_path(self.user_node(user), phone_node, cpg_node)
