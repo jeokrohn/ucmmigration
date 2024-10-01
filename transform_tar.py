@@ -148,7 +148,7 @@ def progress(items):
     print(f', got {i + 1} records', end='', flush=True)
 
 
-def remove_fields(fields_to_remove: list[str], in_file: TextIOBase) -> TextIOBase:
+def remove_fields(in_file: TextIOBase, fields_to_remove: list[str], max_devices: int=None) -> TextIOBase:
     """
     Remove fields from a CSV file
     """
@@ -172,7 +172,7 @@ def remove_fields(fields_to_remove: list[str], in_file: TextIOBase) -> TextIOBas
     col_idx_to_remove = {i
                          for i, field in enumerate(fieldnames)
                          if ((m := col_re.match(field)) and
-                             (not m.group(0).startswith('DEVICE NAME') or int(m.group(1)) > 1))}
+                             (not m.group(0).startswith('DEVICE NAME') or int(m.group(1)) > max_devices))}
 
     out_file = io.StringIO()
     csv_writer = csv.writer(out_file, delimiter=',', doublequote=True,
@@ -189,10 +189,6 @@ def remove_fields(fields_to_remove: list[str], in_file: TextIOBase) -> TextIOBas
     return out_file
 
 
-# definition of transforms to apply to CSV files
-csv_transforms: dict[str, list[Callable[[TextIOBase], TextIOBase]]] = {
-    'enduser.csv': [partial(remove_fields, ENDUSER_CSV_EXCLUDED_FIELDS)],
-    'phone.csv': [partial(remove_fields, PHONE_CSV_EXCLUDED_FIELDS)]}
 
 
 @contextmanager
@@ -216,10 +212,17 @@ def transform():
                                         'files within it')
     parser.add_argument('tar_file', help='the TAR file to transform')
     parser.add_argument('--readonly', action='store_true', help='do not write the transformed TAR file')
+    parser.add_argument('--maxdevices', type=int, help='maximum number of DEVICE NAME columns to keep. Default: 5', default=5)
 
     args = parser.parse_args()
     input_tar = args.tar_file
     read_only = args.readonly
+    max_devices = args.maxdevices
+
+    # definition of transforms to apply to CSV files
+    csv_transforms: dict[str, list[Callable[[TextIOBase], TextIOBase]]] = {
+        'enduser.csv': [partial(remove_fields, fields_to_remove=ENDUSER_CSV_EXCLUDED_FIELDS, max_devices=max_devices)],
+        'phone.csv': [partial(remove_fields, fields_to_remove=PHONE_CSV_EXCLUDED_FIELDS)]}
 
     if not os.path.isfile(input_tar):
         raise ValueError(f'{input_tar} is not a file')
