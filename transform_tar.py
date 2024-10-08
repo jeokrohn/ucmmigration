@@ -129,7 +129,8 @@ ENDUSER_CSV_EXCLUDED_FIELDS = ['ASSOCIATED PC', 'MIDDLE NAME', 'PAGER', 'HOME PH
                                'PIN CANT CHANGE',
                                'PIN MUST CHANGE AT NEXT LOGIN', 'PIN DOES NOT EXPIRE', 'PIN AUTHENTICATION RULE',
                                'PIN', 'APPLICATION SERVER NAME', 'CONTENT', 'ACCESS CONTROL GROUP',
-                               'DEFAULT PROFILE', 'DEVICE NAME', 'DESCRIPTION', 'TYPE USER ASSOCIATION',
+                               'DEFAULT PROFILE', 'DEVICE NAME', 'DESCRIPTION',
+                               'TYPE USER ASSOCIATION',
                                'TYPE PATTERN USAGE',
                                'NAME DIALING', 'MLPP PRECEDENCE AUTHORIZATION LEVEL',
                                'MLPP USER IDENTIFICATION NUMBER',
@@ -161,18 +162,19 @@ def remove_fields(in_file: TextIOBase, fields_to_remove: list[str], max_devices:
         return r
 
     # buid regex to match columns to remove
-    col_re = f'^(?:{"|".join(single_column(col) for col in fields_to_remove)})( \d+)?$'
+    col_re = f'^({"|".join(single_column(col) for col in fields_to_remove)})( \d+)?$'
     col_re = re.compile(col_re)
 
     reader = csv.reader(in_file, delimiter=',', doublequote=True, escapechar=None, quotechar='"',
                         skipinitialspace=True, strict=True)
     fieldnames = next(reader)
 
-    # remove matching columns but keep "DEVICE NAME 1"
+    # remove matching columns but keep "DEVICE NAME 1" and "TYPE USER ASSOCIATION 1"
+    keep_1st_few = {'DEVICE NAME', 'TYPE USER ASSOCIATION'}
     col_idx_to_remove = {i
                          for i, field in enumerate(fieldnames)
                          if ((m := col_re.match(field)) and
-                             (not m.group(0).startswith('DEVICE NAME') or int(m.group(1)) > max_devices))}
+                             (m.group(1) not in keep_1st_few or int(m.group(2)) > max_devices))}
 
     out_file = io.StringIO()
     csv_writer = csv.writer(out_file, delimiter=',', doublequote=True,
