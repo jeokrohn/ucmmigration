@@ -1,13 +1,88 @@
+import os
+import webbrowser
 from itertools import chain
 from collections import defaultdict
 import logging
 import networkx as nx
 import plotly.graph_objects as go
+from pydantic import BaseModel, model_validator
+
 from ucmexport import *
 
-from typing import Union, Set, Generator, Dict, List
+from typing import Union, Set, Generator, Dict, List, Optional
 
 log = logging.getLogger(__name__)
+
+JS_TEMPLATE_3D = """
+<head>
+  <style> body { margin: 0; } </style>
+
+  <script src="https://unpkg.com/3d-force-graph"></script>
+  <!--<script src="../../dist/3d-force-graph.js"></script>-->
+</head>
+
+<body>
+  <div id="3d-graph"></div>
+
+  <script>
+    const gData = {};
+
+    const Graph = ForceGraph3D()
+      (document.getElementById('3d-graph'))
+        .nodeAutoColorBy('group')
+        .linkOpacity(0.5)
+        .linkCurvature(0.2)
+        .linkCurveRotation(1)
+        .linkDirectionalParticles(2)
+        .graphData(gData)
+        .onNodeClick(node => {
+          // Aim at node from outside it
+          const distance = 40;
+          const distRatio = 1 + distance/Math.hypot(node.x, node.y, node.z);
+
+          const newPos = node.x || node.y || node.z
+            ? { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio }
+            : { x: 0, y: 0, z: distance }; // special case if node is in (0,0,0)
+
+          Graph.cameraPosition(
+            newPos, // new position
+            node, // lookAt ({ x, y, z })
+            3000  // ms transition duration
+          );
+        });
+  </script>
+</body>
+"""
+
+
+class GDataNode(BaseModel):
+    id: str
+    name: str
+    group: Optional[str] = None
+
+
+
+
+class GDataLink(BaseModel):
+    source: str
+    target: str
+
+    @model_validator(mode='after')
+    def val_node(self):
+        source_type = self.source.split()[0]
+        target_type = self.target.split()[0]
+        # user is always a target
+        if source_type == 'user':
+            self.source, self.target = self.target, self.source
+        # dn is always a source
+        if target_type == 'dn':
+            self.source, self.target = self.target, self.source
+        return self
+
+
+class GData(BaseModel):
+    nodes: list[GDataNode]
+    links: list[GDataLink]
 
 
 class UserGraph(nx.Graph):
@@ -39,7 +114,7 @@ class UserGraph(nx.Graph):
         return f'CPG {cpg.name}'
 
     @staticmethod
-    def ignore_uid(proxy:Proxy)->set[str]:
+    def ignore_uid(proxy: Proxy) -> set[str]:
         # we want to ignore users that own an excessive number of phones
         phones_per_user: dict[str, int] = defaultdict(int)
         for phone in proxy.phones.list:
@@ -161,19 +236,19 @@ class UserGraph(nx.Graph):
                            for user_id, phones in phones_by_user_id.items()
                            if ((user_id not in ignore_uid) and
                                (dnps := chain.from_iterable((line.dn_and_partition
-                                                            for line in phone.lines.values())
-                                                           for phone in phones)))}
+                                                             for line in phone.lines.values())
+                                                            for phone in phones)))}
         # for each user id and DN get phones with different users
         phones_by_dn_and_partition = proxy.phones.by_dn_and_partition
         phones_other_users_by_user_and_dnp = {user_id: phones_other_users_by_dn
                                               for user_id, dnps in dnps_by_user_id.items()
                                               if ((user_id not in ignore_uid) and
                                                   (phones_other_users_by_dn :=
-                                                  {dnp: phones
-                                                   for dnp in dnps
-                                                   if (phones := [phone
-                                                                  for phone in phones_by_dn_and_partition[dnp]
-                                                                  if (phone.user_set - {user_id} - ignore_uid)])}))}
+                                                   {dnp: phones
+                                                    for dnp in dnps
+                                                    if (phones := [phone
+                                                                   for phone in phones_by_dn_and_partition[dnp]
+                                                                   if (phone.user_set - {user_id} - ignore_uid)])}))}
 
         users_added = 0
         for user_id, phones_other_user_by_dnp in phones_other_users_by_user_and_dnp.items():
@@ -515,3 +590,23 @@ class UserGraph(nx.Graph):
                         )
         fig.write_html('user dependencies.html')
         fig.show()
+
+    def draw3d(self):
+        """
+        Draw the graph in 3d
+        :return:
+        """
+        nodes = []
+        node_groups = {}
+        for node in self.nodes:
+            node_group = node.split()[0]
+            if (node_group_id:=node_groups.get(node_group)) is None:
+                node_group_id = len(node_group)
+                node_groups[node_group_id] = node_group
+            nodes.append(GDataNode(id=node, name=node, group=str(node_group_id)))
+        links = [GDataLink(source=source, target=target) for source, target in self.edges]
+        g_data = GData(nodes=nodes, links=links)
+        html_file = 'user dependencies 3d.html'
+        with open(html_file, mode='w') as f:
+            f.write(JS_TEMPLATE_3D.replace('{}', g_data.model_dump_json(indent=2)))
+        webbrowser.open(f'file://{os.path.abspath(html_file)}', new=2)  # nosec:'html_file, new=2)

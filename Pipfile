@@ -11,6 +11,7 @@ matplotlib = "*"
 scipy = "*"
 tqdm = "*"
 python-dotenv = "*"
+pydantic = "*"
 
 [dev-packages]
 pyinstaller = "*"

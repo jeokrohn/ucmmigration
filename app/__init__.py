@@ -258,6 +258,15 @@ class App:
         self.assert_user_graph()
         self.user_graph.draw()
 
+    @menu_register('Draw 3D user dependency')
+    def menu_draw_user_clusters3d(self):
+        """
+        Create a graph of users
+        :return: None
+        """
+        self.assert_user_graph()
+        self.user_graph.draw3d()
+
     @menu_register('Phones without lines')
     def menu_phones_no_lines(self):
         phones_no_lines = [phone for phone in self.proxy.phones.list if len(phone.lines) == 0]
@@ -803,7 +812,8 @@ class App:
                     print(f'{dial_string}: {tp.pattern}')
                     lookup_result = da_tree.lookup(digits=dial_string, css=combined_css)
                     print(f'Dial string {dial_string} lookup led to {lookup_result}')
-                    # translated_dial_string, css = tp.translate(digits=tp.pattern.replace('.', ''), css=combined_partitions)
+                    # translated_dial_string, css = tp.translate(digits=tp.pattern.replace('.', ''),
+                    #                                            css=combined_partitions)
                     foo = 1
         pass
 
@@ -862,7 +872,7 @@ class App:
                 phones |= device_profiles
                 if phones:
                     print(', phones or device profiles: ', end='')
-                    owners: List[List[str]] = []    # list of owners per phone
+                    owners: List[List[str]] = []  # list of owners per phone
                     for phone_or_dp in phones:
                         if isinstance(phone_or_dp, Phone):
                             phone_or_dp: Phone
